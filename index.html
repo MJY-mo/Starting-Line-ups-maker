@@ -1,0 +1,1890 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放り込みフォーメーション表</title>
+    <link rel="icon" href="favicon15.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --grass-color: #288a42;
+            --line-color: #ffffff;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .grass {
+            background-color: var(--grass-color);
+            background-image:
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .custom-grass {
+            background-size: cover;
+            background-position: center;
+        }
+        .modal-backdrop {
+            background-color: rgba(0,0,0,0.5);
+            transition: opacity 0.3s ease;
+        }
+        .tile {
+            touch-action: none;
+            user-select: none;
+        }
+        .tile-on-field {
+            position: absolute;
+            cursor: grab;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .tile-on-panel {
+            display: flex;
+            align-items: center;
+            cursor: grab;
+        }
+        #drag-clone {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.8;
+        }
+        .tile-svg-container {
+            position: relative;
+        }
+        .tile-marks-right {
+            position: absolute;
+            top: 0;
+            right: -18px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            align-items: center;
+        }
+        .tile-marks-left {
+            position: absolute;
+            top: 0;
+            left: -18px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            align-items: center;
+        }
+        .tile-marks-right .mark, .tile-marks-left .mark {
+            width: auto;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 4px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            background-color: rgba(0,0,0,0.6);
+        }
+        .tile-mark-bottom-left {
+            position: absolute;
+            bottom: -4px;
+            left: -4px;
+        }
+        .tile-mark-bottom-right {
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+        }
+        .tile-mark-bottom-left .mark, .tile-mark-bottom-right .mark {
+            width: auto;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 2px;
+            border-radius: 9999px; /* 円形にする */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            background-color: rgba(0,0,0,0.7);
+            border: 1px solid white;
+        }
+        .soccer-ball {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            cursor: grab;
+            z-index: 40;
+        }
+        .dragging-source {
+            opacity: 0.4;
+            transition: opacity 0.2s;
+        }
+        body.dragging * {
+            cursor: grabbing !important;
+        }
+        .drop-area {
+             border: 2px dashed #ccc;
+        }
+        .drop-area.drag-over {
+            border-color: #3498db;
+            background-color: #f0f8ff;
+        }
+        .drop-placeholder {
+            height: 50px;
+            background-color: rgba(52, 152, 219, 0.3);
+            border: 2px dashed #3498db;
+            border-radius: 0.25rem;
+            margin: 4px 0;
+        }
+        .help-content ul ul {
+            margin-top: 0.5rem;
+            margin-left: 1rem;
+            list-style-type: disc;
+        }
+    </style>
+</head>
+<body class="bg-gray-800 text-white h-screen flex flex-col select-none">
+
+    <!-- トップパネル -->
+    <header class="bg-gray-900 p-2 flex items-center justify-between shadow-lg">
+        <h1 class="text-xl font-bold" data-lang="app_title">放り込みフォーメーション表</h1>
+        <div class="flex items-center space-x-3">
+            <button id="fullscreen-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" title="Fullscreen"><i class="fas fa-expand"></i></button>
+            <button id="export-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="export_image_title"><i class="fas fa-camera"></i> <span data-lang="export_image">画像出力</span></button>
+            <button id="save-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="save_data_title"><i class="fas fa-save"></i> <span data-lang="save_data">保存</span></button>
+            <div class="relative">
+                <button id="load-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="load_data_title"><i class="fas fa-folder-open"></i> <span data-lang="load_data">呼出</span></button>
+                <input type="file" id="load-input" class="hidden" accept=".json">
+            </div>
+            <button id="help-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="help_title"><i class="fas fa-question-circle"></i></button>
+            <select id="lang-select" class="bg-gray-700 text-white p-2 rounded-lg">
+                <option value="ja">日本語</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- 左チームパネル -->
+        <aside id="team-panel-0" class="w-64 bg-gray-700 p-2 flex flex-col team-panel transition-colors duration-200" data-team-id="0">
+        </aside>
+
+        <!-- 中央フィールド -->
+        <main id="field-container" class="flex-1 bg-gray-800 flex justify-center items-center p-4 relative overflow-hidden">
+            <div id="field-area" class="relative grass shadow-2xl">
+                <!-- ここにSVGでコートライン、タイル、ボールが描画される -->
+            </div>
+        </main>
+
+        <!-- 右チームパネル -->
+        <aside id="team-panel-1" class="w-64 bg-gray-700 p-2 flex flex-col team-panel transition-colors duration-200" data-team-id="1">
+        </aside>
+    </div>
+
+    <!-- 各種モーダルウィンドウ -->
+    <!-- フィールド設定モーダル -->
+    <div id="field-settings-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-96">
+            <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="field_settings">フィールド設定</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <button id="toggle-orientation-btn" class="w-full bg-blue-600 hover:bg-blue-500 p-2 rounded" data-lang="toggle_pitch_orientation">ピッチ縦横切替</button>
+                <button id="swap-sides-btn" class="w-full bg-green-600 hover:bg-green-500 p-2 rounded" data-lang="flip_pitch">ピッチ反転</button>
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="change-ball-image-btn" class="w-full bg-yellow-600 hover:bg-yellow-500 p-2 rounded" data-lang="change_ball_image">ボール画像を変更</button>
+                    <button id="reset-ball-image-btn" class="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded" data-lang="reset_ball_image">初期化</button>
+                </div>
+                 <div class="grid grid-cols-2 gap-4">
+                    <button id="change-grass-image-btn" class="w-full bg-teal-600 hover:bg-teal-500 p-2 rounded" data-lang="change_grass_image">芝生の画像を変更</button>
+                    <button id="reset-grass-image-btn" class="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded" data-lang="reset_grass_image">初期化</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="ball-image-input" class="hidden" accept="image/*">
+    <input type="file" id="grass-image-input" class="hidden" accept="image/*">
+    
+    <!-- チーム設定モーダル -->
+    <div id="team-settings-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-auto max-w-6xl max-h-[90vh] overflow-y-auto">
+             <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="team_settings">チーム設定</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-1" data-lang="team_name">チーム名</label>
+                    <input id="team-name-input" type="text" class="w-full bg-gray-700 p-2 rounded">
+                </div>
+                <div class="grid grid-cols-2 gap-x-6">
+                    <div>
+                        <label class="block mb-1" data-lang="drop_name_list">選手名リストで一括登録</label>
+                        <div id="name-list-drop-area" class="w-full h-20 bg-gray-700 rounded flex items-center justify-center drop-area">
+                            <span data-lang="drop_name_list_here">ここに選手リスト(.txt)をドロップ</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block mb-1" data-lang="tile_bg_image_common">タイル背景画像（チーム共通）</label>
+                        <div id="bg-image-drop-area" class="w-full h-20 bg-gray-700 rounded flex items-center justify-center drop-area">
+                            <span data-lang="drop_image_here">ここに画像をドロップ</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                     <label class="block mb-1" data-lang="bg_image_opacity">背景画像の透過度</label>
+                     <div class="flex items-center">
+                        <input id="bg-image-opacity-input" type="range" min="0" max="1" step="0.05" class="w-full mr-2">
+                        <button id="clear-bg-image-btn" class="bg-red-600 hover:bg-red-500 p-1 rounded text-sm whitespace-nowrap" data-lang="clear_image">画像を消去</button>
+                     </div>
+                </div>
+                
+                <div>
+                    <label class="block mb-1" data-lang="tile_bg_color">タイル背景色</label>
+                    <input id="bg-color-input" type="color" class="w-full h-10 bg-gray-700 p-1 rounded">
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-6 gap-y-4 pt-2 border-t border-gray-700">
+                    <!-- Tile Shape and Size -->
+                    <div class="col-span-2 grid grid-cols-2 gap-x-6 items-end">
+                        <div>
+                            <label class="block mb-1" data-lang="tile_shape">タイルの形</label>
+                            <select id="tile-shape-select" class="w-full bg-gray-700 p-2 rounded">
+                                <option value="circle" data-lang="circle">円</option>
+                                <option value="hexagon" data-lang="hexagon">6角形</option>
+                                <option value="octagon" data-lang="octagon">8角形</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block mb-1" data-lang="tile_size">タイルのサイズ</label>
+                            <div class="flex items-center">
+                                <input id="tile-size-input" type="range" min="30" max="80" step="1" class="w-full">
+                                <span id="tile-size-value" class="ml-2 w-12 text-center">60px</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Border Color and Width -->
+                    <div class="col-span-2 grid grid-cols-2 gap-x-6 items-end">
+                        <div>
+                            <label class="block mb-1" data-lang="tile_border_color">タイル枠線の色</label>
+                            <input id="border-color-input" type="color" class="w-full h-10 bg-gray-700 p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1" data-lang="border_width">枠線の太さ</label>
+                            <div class="flex items-center">
+                                <input id="border-width-input" type="range" min="0" max="10" step="0.5" class="w-full">
+                                <span id="border-width-value" class="ml-2 w-12 text-center">2px</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Jersey Number Color and Size -->
+                    <div class="col-span-2 grid grid-cols-2 gap-x-6 items-end">
+                        <div>
+                           <label class="block mb-1" data-lang="jersey_number_color">背番号の色</label>
+                           <input id="number-color-input" type="color" class="w-full h-10 bg-gray-700 p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1" data-lang="jersey_number_size">背番号のサイズ</label>
+                            <div class="flex items-center">
+                                <input id="number-size-input" type="range" min="10" max="40" step="1" class="w-full">
+                                <span id="number-size-value" class="ml-2 w-12 text-center">20px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-gray-700">
+                     <!-- Player Name Color and Size -->
+                    <div class="col-span-2 grid grid-cols-2 gap-x-6 items-end">
+                        <div>
+                           <label class="block mb-1" data-lang="player_name_color">選手名の色</label>
+                           <input id="name-color-input" type="color" class="w-full h-10 bg-gray-700 p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1" data-lang="player_name_size">選手名の文字サイズ</label>
+                            <div class="flex items-center">
+                                <input id="name-size-input" type="range" min="8" max="24" step="1" class="w-full">
+                                <span id="name-size-value" class="ml-2 w-12 text-center">14px</span>
+                            </div>
+                        </div>
+                    </div>
+                     <!-- Affiliation Color and Size -->
+                    <div class="col-span-2 grid grid-cols-2 gap-x-6 items-end">
+                        <div>
+                           <label class="block mb-1" data-lang="affiliation_color">所属の色</label>
+                           <input id="affiliation-color-input" type="color" class="w-full h-10 bg-gray-700 p-1 rounded">
+                        </div>
+                        <div>
+                            <label class="block mb-1" data-lang="affiliation_size">所属の文字サイズ</label>
+                            <div class="flex items-center">
+                                <input id="affiliation-size-input" type="range" min="8" max="20" step="1" class="w-full">
+                                <span id="affiliation-size-value" class="ml-2 w-12 text-center">12px</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-end space-x-6 pt-4 border-t border-gray-700">
+                    <!-- Display Settings -->
+                    <div class="flex-1">
+                        <label class="block mb-1" data-lang="display_settings_field">フィールドでの表示設定</label>
+                        <div class="flex space-x-4 mt-2">
+                            <label class="flex items-center"><input id="show-name-checkbox" type="checkbox" class="mr-2"> <span data-lang="show_player_name">選手名を表示</span></label>
+                            <label class="flex items-center"><input id="show-affiliation-checkbox" type="checkbox" class="mr-2"> <span data-lang="show_affiliation">所属を表示</span></label>
+                        </div>
+                    </div>
+                    <!-- Attack Direction -->
+                    <div class="flex-1">
+                        <label class="block mb-1" data-lang="attack_direction">攻める方向</label>
+                        <select id="attack-direction-select" class="w-full bg-gray-700 p-2 rounded mt-1">
+                            <option value="up" data-lang="up">上</option>
+                            <option value="down" data-lang="down">下</option>
+                            <option value="left" data-lang="left">左</option>
+                            <option value="right" data-lang="right">右</option>
+                            <option value="none" data-lang="none">非表示</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 個別タイル設定モーダル -->
+    <div id="tile-settings-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-96">
+            <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="tile_settings">タイル設定</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="space-y-3">
+                <div><label data-lang="player_name">選手名</label><input id="tile-name-input" type="text" class="w-full bg-gray-700 p-2 rounded mt-1"></div>
+                <div><label data-lang="player_number">番号</label><input id="tile-number-input" type="number" min="0" class="w-full bg-gray-700 p-2 rounded mt-1"></div>
+                <div>
+                    <label data-lang="position">ポジション</label>
+                    <select id="tile-position-select" class="w-full bg-gray-700 p-2 rounded mt-1">
+                        <option value="">(なし)</option>
+                        <option value="FW">FW</option>
+                        <option value="MF">MF</option>
+                        <option value="DF">DF</option>
+                        <option value="GK">GK</option>
+                    </select>
+                </div>
+                <div><label data-lang="affiliation">所属</label><input id="tile-affiliation-input" type="text" class="w-full bg-gray-700 p-2 rounded mt-1"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- フィールドタイル編集モーダル -->
+    <div id="field-tile-edit-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6">
+            <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="edit_marks">マーク編集</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <h4 class="font-bold" data-lang="cards">カード</h4>
+                    <button data-mark-type="yellowCard" class="mark-btn w-full bg-yellow-400 text-black p-2 rounded" data-lang-title="yellow_card_mark">🟨</button>
+                    <button data-mark-type="redCard" class="mark-btn w-full bg-red-600 p-2 rounded" data-lang-title="red_card_mark">🟥</button>
+                </div>
+                 <div class="space-y-2">
+                    <h4 class="font-bold" data-lang="other">その他</h4>
+                    <button data-mark-type="captain" class="mark-btn w-full bg-blue-500 p-2 rounded" data-lang-title="captain_mark">Ⓒ</button>
+                    <button data-mark-type="goal" class="mark-btn w-full bg-green-500 p-2 rounded" data-lang-title="goal_mark">⚽</button>
+                    <button data-mark-type="assist" class="mark-btn w-full bg-blue-600 text-white font-bold p-2 rounded" data-lang-title="assist_mark">A</button>
+                    <button data-mark-type="substitution" class="mark-btn w-full bg-gray-500 p-2 rounded flex justify-center items-center" data-lang-title="substitution_mark"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="green" d="M2,19.333L12,4.667L22,19.333H2z"/></svg></button>
+                 </div>
+                 <div class="col-span-2">
+                    <button id="clear-marks-btn" class="w-full bg-gray-600 hover:bg-gray-500 p-2 rounded" data-lang="clear_all_marks">全マーク消去</button>
+                 </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 画像出力モーダル -->
+    <div id="export-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-96">
+            <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="export_image">画像出力</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-1" data-lang="export_area">出力範囲</label>
+                    <select id="export-area-select" class="w-full bg-gray-700 p-2 rounded">
+                        <option value="all" data-lang="entire_screen">全体</option>
+                        <option value="field" data-lang="field_only">フィールドのみ</option>
+                    </select>
+                </div>
+                 <div>
+                    <label class="block mb-1" data-lang="image_width_px">画像幅 (px)</label>
+                    <input id="export-width-input" type="number" value="1920" class="w-full bg-gray-700 p-2 rounded">
+                </div>
+                <button id="export-confirm-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 p-2 rounded flex items-center justify-center">
+                    <span data-lang="execute_export">出力実行</span>
+                    <i id="export-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ヘルプモーダル -->
+    <div id="help-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-1/2 max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="help">操作説明</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="prose prose-invert max-w-none space-y-4 help-content" data-lang-content="ja">
+                <h4>基本操作</h4>
+                <ul>
+                    <li><strong>タイルの移動:</strong> サイドパネルのタイルをドラッグしてフィールドに配置します。フィールドからサイドパネルに戻すことも可能です。</li>
+                    <li><strong>タイルの並び替え:</strong> サイドパネル内でタイルをドラッグ＆ドロップすると、選手の順番を自由に入れ替えられます。また、チーム名横の整列ボタン <i class="fas fa-sort"></i> をクリックすると、「ポジション順」→「背番号順」→「カスタム（手動整列）順」に自動で並び替えができます。</li>
+                    <li><strong>選手の削除:</strong> サイドパネルの選手タイルにカーソルを合わせると右上に表示される「×」ボタンで選手を削除できます。</li>
+                    <li><strong>ボールの移動:</strong> フィールド中央のサッカーボールをドラッグして移動できます。</li>
+                </ul>
+                <h4>各種設定</h4>
+                <ul>
+                    <li><strong>テキストファイルから選手を一括登録:</strong> チーム設定モーダル内で、選手名が一行ずつ書かれたテキストファイル（.txt）をドラッグ＆ドロップすると、選手を一括で登録できます。ファイルは以下の形式で解析されます：
+                        <ul>
+                            <li><code>背番号 選手名 (所属)</code> の形式で書かれている行を解釈します。</li>
+                            <li>行頭の数字を「背番号」、丸括弧<code>()</code>で囲まれた部分を「所属」として自動で設定します。</li>
+                            <li>背番号や所属は省略可能です。例: <code>選手名のみ</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>フィールド設定:</strong> フィールドエリアをダブルクリックすると、コートの縦横表示や反転、ボールや芝生の画像を変更できます。</li>
+                    <li><strong>チーム設定:</strong> チーム名横の歯車アイコン <i class="fas fa-cog"></i> をクリックすると、チーム名、タイルの形状や色、選手の表示設定などを変更できます。</li>
+                    <li><strong>個別タイル設定:</strong> サイドパネルのタイルをダブルクリックすると、選手名や背番号、ポジションなどを個別に設定できます。</li>
+                    <li><strong>マーク編集:</strong> フィールド上のタイルをダブルクリックすると、キャプテンマークやカード、得点などのマークを付けられます。</li>
+                </ul>
+                <h4>トップメニュー</h4>
+                <ul>
+                    <li><strong><i class="fas fa-expand"></i> 全画面表示:</strong> アプリを全画面で表示します。</li>
+                    <li><strong><i class="fas fa-camera"></i> 画像出力:</strong> 表示されているフォーメーションをJPEG画像として保存します。</li>
+                    <li><strong><i class="fas fa-save"></i> 保存:</strong> 現在の状態を設定ファイル(.json)としてダウンロードします。</li>
+                    <li><strong><i class="fas fa-folder-open"></i> 呼出:</strong> 保存した設定ファイルを読み込み、状態を復元します。</li>
+                </ul>
+            </div>
+             <div class="prose prose-invert max-w-none space-y-4 help-content" data-lang-content="en" style="display: none;">
+                <h4>Basic Controls</h4>
+                <ul>
+                    <li><strong>Move Tiles:</strong> Drag tiles from the side panel to place them on the field. You can also drag them back from the field to the panel.</li>
+                    <li><strong>Reorder Tiles:</strong> Drag and drop tiles within the side panel to reorder the players manually. You can also click the sort icon <i class="fas fa-sort"></i> next to the team name to automatically sort by "Position" -> "Number" -> "Custom" (manual order).</li>
+                    <li><strong>Delete Player:</strong> Hover over a player tile in the side panel and click the '×' button that appears in the top-right corner to delete the player.</li>
+                    <li><strong>Move Ball:</strong> Drag the soccer ball in the center of the field to move it.</li>
+                </ul>
+                <h4>Settings</h4>
+                 <ul>
+                    <li><strong>Bulk Register from Text File:</strong> In the team settings modal, you can drag and drop a text file (.txt) with one player name per line to register players in bulk. The file is parsed as follows:
+                        <ul>
+                            <li>It interprets lines in the format: <code>Number Player Name (Affiliation)</code>.</li>
+                            <li>Numbers at the start of a line are set as the "Jersey Number", and text within parentheses <code>()</code> is set as the "Affiliation".</li>
+                            <li>Both number and affiliation are optional. E.g., <code>Player Name only</code></li>
+                        </ul>
+                    </li>
+                    <li><strong>Field Settings:</strong> Double-click the field area to toggle orientation, flip the pitch, and change the ball/grass image.</li>
+                    <li><strong>Team Settings:</strong> Click the gear icon <i class="fas fa-cog"></i> next to the team name to change the team name, tile shape, colors, player display settings, and more.</li>
+                    <li><strong>Individual Tile Settings:</strong> Double-click a tile in the side panel to set the player's name, number, position etc.</li>
+                    <li><strong>Edit Marks:</strong> Double-click a tile on the field to add marks like captain, cards, goals, etc.</li>
+                </ul>
+                <h4>Top Menu</h4>
+                <ul>
+                    <li><strong><i class="fas fa-expand"></i> Fullscreen:</strong> Display the application in fullscreen mode.</li>
+                    <li><strong><i class="fas fa-camera"></i> Export Image:</strong> Save the current formation as a JPEG image.</li>
+                    <li><strong><i class="fas fa-save"></i> Save:</strong> Download the current state as a configuration file (.json).</li>
+                    <li><strong><i class="fas fa-folder-open"></i> Load:</strong> Load a saved configuration file to restore the state.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 確認モーダル -->
+    <div id="confirm-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-96">
+            <h3 id="confirm-modal-title" class="text-xl font-bold mb-4" data-lang="confirm_title">確認</h3>
+            <p id="confirm-modal-message" class="mb-6"></p>
+            <div class="flex justify-end space-x-4">
+                <button id="confirm-modal-cancel-btn" class="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded" data-lang="cancel">いいえ</button>
+                <button id="confirm-modal-ok-btn" class="bg-red-600 hover:bg-red-500 px-4 py-2 rounded" data-lang="confirm">はい</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- 定数定義 ---
+        const FIELD_ASPECT_RATIO = 105 / 68;
+        const BALL_SIZE = 40;
+
+        // --- I18N (国際化) ---
+        const translations = {
+            ja: {
+                app_title: "放り込みフォーメーション表", export_image: "画像出力", save_data: "保存", load_data: "呼出",
+                export_image_title: "画像をエクスポート", save_data_title: "データを保存", load_data_title: "データを読み込み", help_title: "ヘルプ",
+                field_settings: "フィールド設定", toggle_pitch_orientation: "ピッチ縦横切替", flip_pitch: "ピッチ反転", team_settings: "チーム設定",
+                team_name: "チーム名", tile_shape: "タイルの形", circle: "円", hexagon: "6角形", octagon: "8角形",
+                tile_border_color: "タイル枠線の色", border_width: "枠線の太さ", tile_bg_color: "タイル背景色", tile_bg_image_common: "タイル背景画像（チーム共通）", drop_image_here: "ここに画像をドロップ",
+                clear_image: "画像を消去", jersey_number_color: "背番号の色", jersey_number_size: "背番号のサイズ", display_settings_field: "フィールドでの表示設定",
+                show_player_name: "選手名を表示", show_affiliation: "所属を表示", attack_direction: "攻める方向", up: "上", down: "下", left: "左", right: "右", none: "非表示",
+                tile_settings: "タイル設定", player_name: "選手名", player_number: "番号", position: "ポジション", affiliation: "所属",
+                edit_marks: "マーク編集", cards: "カード", other: "その他", clear_all_marks: "全マーク消去", export_area: "出力範囲",
+                entire_screen: "全体", field_only: "フィールドのみ", image_width_px: "画像幅 (px)", execute_export: "出力実行", help: "操作説明",
+                add_player: "選手追加", remove_player: "選手削除", tile_size: "タイルのサイズ", change_ball_image: "ボール画像を変更", reset_ball_image: "初期化", change_grass_image: "芝生の画像を変更", reset_grass_image: "初期化",
+                drop_name_list: "選手名リストで一括登録", drop_name_list_here: "ここに選手リスト(.txt)をドロップ",
+                yellow_card_mark: "イエローカード", red_card_mark: "レッドカード", captain_mark: "キャプテン", goal_mark: "ゴール", assist_mark: "アシスト", substitution_mark: "途中出場",
+                confirm_title: "確認", confirm_delete_message: "本当にこの選手を削除しますか？", cancel: "いいえ", confirm: "はい",
+                sort_players: "選手を整列",
+                bg_image_opacity: "背景画像の透過度",
+                player_name_color: "選手名の色",
+                player_name_size: "選手名の文字サイズ",
+                affiliation_color: "所属の色",
+                affiliation_size: "所属の文字サイズ",
+            },
+            en: {
+                app_title: "Formation Board", export_image: "Export Image", save_data: "Save", load_data: "Load",
+                export_image_title: "Export as Image", save_data_title: "Save Data", load_data_title: "Load Data", help_title: "Help",
+                field_settings: "Field Settings", toggle_pitch_orientation: "Toggle Pitch Orientation", flip_pitch: "Flip Pitch", team_settings: "Team Settings",
+                team_name: "Team Name", tile_shape: "Tile Shape", circle: "Circle", hexagon: "Hexagon", octagon: "Octagon",
+                tile_border_color: "Tile Border Color", border_width: "Border Width", tile_bg_color: "Tile Background Color", tile_bg_image_common: "Tile Background Image (Team)", drop_image_here: "Drop image here",
+                clear_image: "Clear Image", jersey_number_color: "Jersey Number Color", jersey_number_size: "Jersey Number Size", display_settings_field: "Display Settings (on Field)",
+                show_player_name: "Show Player Name", show_affiliation: "Show Affiliation", attack_direction: "Attack Direction", up: "Up", down: "Down", left: "Left", right: "Right", none: "Hide",
+                tile_settings: "Tile Settings", player_name: "Player Name", player_number: "Number", position: "Position", affiliation: "Affiliation",
+                edit_marks: "Edit Marks", cards: "Cards", other: "Other", clear_all_marks: "Clear All Marks", export_area: "Export Area",
+                entire_screen: "Entire Screen", field_only: "Field Only", image_width_px: "Image Width (px)", execute_export: "Export", help: "Help",
+                add_player: "Add Player", remove_player: "Remove Player", tile_size: "Tile Size", change_ball_image: "Change Ball Image", reset_ball_image: "Reset", change_grass_image: "Change Grass Image", reset_grass_image: "Reset",
+                drop_name_list: "Bulk Register with Name List", drop_name_list_here: "Drop player name text file (.txt) here",
+                yellow_card_mark: "Yellow Card", red_card_mark: "Red Card", captain_mark: "Captain", goal_mark: "Goal", assist_mark: "Assist", substitution_mark: "Substitution",
+                confirm_title: "Confirmation", confirm_delete_message: "Are you sure you want to delete this player?", cancel: "No", confirm: "Yes",
+                sort_players: "Sort Players",
+                bg_image_opacity: "Background Image Opacity",
+                player_name_color: "Player Name Color",
+                player_name_size: "Player Name Size",
+                affiliation_color: "Affiliation Color",
+                affiliation_size: "Affiliation Size",
+            }
+        };
+
+        let currentLang = 'ja';
+
+        function t(key) {
+            return translations[currentLang][key] || key;
+        }
+
+        function updateLanguageUI() {
+            document.querySelectorAll('[data-lang]').forEach(el => {
+                const key = el.dataset.lang;
+                el.textContent = t(key);
+            });
+            document.querySelectorAll('[data-lang-title]').forEach(el => {
+                const key = el.dataset.langTitle;
+                el.title = t(key);
+            });
+            
+            document.querySelectorAll('.help-content').forEach(el => {
+                el.style.display = el.dataset.langContent === currentLang ? 'block' : 'none';
+            });
+        }
+
+
+        // --- 状態管理 ---
+        let appState = {};
+        
+        const defaultAppState = {
+            teams: [
+                {
+                    name: 'Team A',
+                    sortState: 'custom',
+                    settings: { 
+                        shape: 'circle', borderColor: '#ffffff', borderWidth: 2, bgColor: '#ff0000', 
+                        bgImage: null, bgImageOpacity: 1, 
+                        numberColor: '#ffffff', numberSize: 20, 
+                        showName: true, showAffiliation: false, 
+                        nameColor: '#ffffff', nameSize: 14,
+                        affiliationColor: '#dddddd', affiliationSize: 12,
+                        attackDirection: 'right', tileSize: 60 
+                    },
+                    tiles: [],
+                },
+                {
+                    name: 'Team B',
+                    sortState: 'custom',
+                    settings: { 
+                        shape: 'circle', borderColor: '#ffffff', borderWidth: 2, bgColor: '#0000ff', 
+                        bgImage: null, bgImageOpacity: 1, 
+                        numberColor: '#ffffff', numberSize: 20, 
+                        showName: true, showAffiliation: false, 
+                        nameColor: '#ffffff', nameSize: 14,
+                        affiliationColor: '#dddddd', affiliationSize: 12,
+                        attackDirection: 'left', tileSize: 60 
+                    },
+                    tiles: [],
+                }
+            ],
+            field: {
+                orientation: 'horizontal', // or 'vertical'
+                grassImage: './images/p0305_l.jpg',
+                ball: { 
+                    x: 50, 
+                    y: 50,
+                    imageSrc: './images/soccer_ball.jpg'
+                }
+            },
+            lang: 'ja'
+        };
+        
+        function createDefaultTile(id, number, order) {
+            return {
+                id: id,
+                number: number,
+                name: `Player ${number}`,
+                position: '',
+                affiliation: '',
+                order: order,
+                location: 'panel', // 'panel' or 'field'
+                x: null, // percentage
+                y: null, // percentage
+                marks: {
+                    yellowCard: 0,
+                    redCard: 0,
+                    captain: 0,
+                    goal: 0,
+                    assist: 0,
+                    substitution: 0
+                }
+            };
+        }
+
+        function initializeState() {
+            appState = JSON.parse(JSON.stringify(defaultAppState)); // Deep copy
+            currentLang = appState.lang;
+            document.getElementById('lang-select').value = currentLang;
+        }
+
+        // --- ドラッグ&ドロップ管理 (リファクタリング版) ---
+        const dragged = {
+            type: null, // 'tile-on-field', 'panel-tile', 'ball'
+            element: null, // ドラッグ中のゴースト要素
+            sourceElement: null, // ドラッグ元の要素
+            
+            // 共通
+            teamId: null,
+            tileId: null,
+
+            // マウス/タッチ位置
+            startX: 0,
+            startY: 0,
+            offsetX: 0,
+            offsetY: 0,
+
+            // 移動前の位置
+            initialX: 0,
+            initialY: 0,
+        };
+
+        function resetDraggedState() {
+            if (dragged.sourceElement) {
+                dragged.sourceElement.classList.remove('dragging-source');
+            }
+            if (dragged.element) {
+                dragged.element.remove();
+            }
+            
+            const placeholder = document.querySelector('.drop-placeholder');
+            if(placeholder) placeholder.remove();
+
+            document.body.classList.remove('dragging');
+
+            dragged.type = null;
+            dragged.element = null;
+            dragged.sourceElement = null;
+            dragged.teamId = null;
+            dragged.tileId = null;
+        }
+
+        // --- SVGヘルパー ---
+        function createTileSVG(team, tile) {
+            const s = team.settings;
+            const size = s.tileSize || 60;
+            const half = size / 2;
+            const strokeWidth = s.borderWidth;
+            let path = '';
+
+            switch (s.shape) {
+                case 'hexagon':
+                    path = `M${half},${strokeWidth} L${size-strokeWidth},${size*0.25} L${size-strokeWidth},${size*0.75} L${half},${size-strokeWidth} L${strokeWidth},${size*0.75} L${strokeWidth},${size*0.25} Z`;
+                    break;
+                case 'octagon':
+                    path = `M${size*0.3},${strokeWidth} L${size*0.7},${strokeWidth} L${size-strokeWidth},${size*0.3} L${size-strokeWidth},${size*0.7} L${size*0.7},${size-strokeWidth} L${size*0.3},${size-strokeWidth} L${strokeWidth},${size*0.7} L${strokeWidth},${size*0.3} Z`;
+                    break;
+                case 'circle':
+                default:
+                    path = `M${half},${half} m-${half-strokeWidth},0 a${half-strokeWidth},${half-strokeWidth} 0 1,0 ${size-strokeWidth*2},0 a${half-strokeWidth},${half-strokeWidth} 0 1,0 -${size-strokeWidth*2},0`;
+                    break;
+            }
+            
+            const clipId = `clip-${tile.id}`;
+            const patternId = `pattern-${tile.id}`;
+            
+            return `
+                <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="tile-svg">
+                    <defs>
+                        <clipPath id="${clipId}">
+                            <path d="${path}" />
+                        </clipPath>
+                        ${s.bgImage ? `
+                        <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="${size}" height="${size}">
+                            <image href="${s.bgImage}" x="0" y="0" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" />
+                        </pattern>
+                        ` : ''}
+                    </defs>
+                    <g clip-path="url(#${clipId})">
+                        <rect x="0" y="0" width="${size}" height="${size}" fill="${s.bgColor}" />
+                        ${s.bgImage ? `<rect x="0" y="0" width="${size}" height="${size}" fill="url(#${patternId})" style="opacity: ${s.bgImageOpacity};" />` : ''}
+                    </g>
+                    <path d="${path}" fill="none" stroke="${s.borderColor}" stroke-width="${strokeWidth}" />
+                    <text x="50%" y="50%" dy="0.1em" dominant-baseline="middle" text-anchor="middle" fill="${s.numberColor}" font-size="${s.numberSize}px" font-weight="bold" style="pointer-events: none; text-shadow: 0 0 5px black, 0 0 3px black;">${tile.number}</text>
+                </svg>
+            `;
+        }
+        
+        // --- 描画ロジック ---
+        function renderAll() {
+            renderTeamPanels();
+            renderField();
+            updateLanguageUI();
+        }
+
+        function renderTeamPanels() {
+            appState.teams.forEach((team, teamId) => {
+                const panel = document.getElementById(`team-panel-${teamId}`);
+                const panelTileList = panel.querySelector('.panel-tile-list') || document.createElement('div');
+                if (!panel.querySelector('.panel-tile-list')) {
+                    panelTileList.className = 'flex-1 overflow-y-auto space-y-2 pr-1 panel-tile-list';
+                }
+
+                const panelTiles = team.tiles.filter(t => t.location === 'panel').sort((a, b) => a.order - b.order);
+                
+                panel.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-lg font-bold truncate">${team.name}</h2>
+                        <div class="flex items-center">
+                           <button class="sort-team-btn p-1 hover:text-blue-400" data-team-id="${teamId}" title="${t('sort_players')}"><i class="fas fa-sort"></i></button>
+                           <button class="team-settings-btn p-1 hover:text-yellow-400" data-team-id="${teamId}" title="${t('team_settings')}"><i class="fas fa-cog"></i></button>
+                           <button class="add-player-btn p-1 hover:text-green-400" data-team-id="${teamId}" title="${t('add_player')}"><i class="fas fa-plus-circle"></i></button>
+                        </div>
+                    </div>
+                `;
+                
+                panelTileList.innerHTML = panelTiles.map(tile => `
+                    <div class="tile tile-on-panel bg-gray-800 p-1 rounded relative group" data-team-id="${teamId}" data-tile-id="${tile.id}">
+                        ${createTileSVG(team, tile)}
+                        <div class="ml-2 flex-1 truncate">
+                            <div class="font-semibold flex items-center">
+                                <span>${tile.name}</span>
+                                ${tile.position ? `<span class="ml-2 text-xs text-gray-400 bg-gray-700 px-1 rounded">${tile.position}</span>` : ''}
+                            </div>
+                            ${tile.affiliation ? `<div class="text-xs text-gray-400">${tile.affiliation}</div>` : ''}
+                        </div>
+                        <button class="delete-tile-btn absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white rounded-full hidden group-hover:flex items-center justify-center text-xs" data-team-id="${teamId}" data-tile-id="${tile.id}">&times;</button>
+                    </div>
+                `).join('');
+                panel.appendChild(panelTileList);
+            });
+        }
+
+        function renderField() {
+            const container = document.getElementById('field-container');
+            const area = document.getElementById('field-area');
+            const containerRect = container.getBoundingClientRect();
+            
+            const aspectRatio = FIELD_ASPECT_RATIO;
+            let fieldWidth, fieldHeight;
+
+            if (appState.field.orientation === 'horizontal') {
+                fieldWidth = Math.min(containerRect.width - 40, (containerRect.height - 40) * aspectRatio);
+                fieldHeight = fieldWidth / aspectRatio;
+            } else { // vertical
+                fieldHeight = Math.min(containerRect.height - 40, (containerRect.width - 40) * aspectRatio);
+                fieldWidth = fieldHeight / aspectRatio;
+            }
+            
+            area.style.width = `${fieldWidth}px`;
+            area.style.height = `${fieldHeight}px`;
+
+            if (appState.field.grassImage) {
+                area.style.backgroundImage = `url(${appState.field.grassImage})`;
+                area.classList.add('custom-grass');
+                area.classList.remove('grass');
+            } else {
+                area.style.backgroundImage = '';
+                area.classList.remove('custom-grass');
+                area.classList.add('grass');
+            }
+
+            area.innerHTML = getFieldLinesSVG(fieldWidth, fieldHeight);
+            
+            const ball = document.createElement('div');
+            ball.className = 'soccer-ball';
+            const ballX = appState.field.ball.x / 100 * fieldWidth;
+            const ballY = appState.field.ball.y / 100 * fieldHeight;
+            ball.style.width = `${BALL_SIZE}px`;
+            ball.style.height = `${BALL_SIZE}px`;
+            ball.style.left = `calc(${ballX}px - ${BALL_SIZE / 2}px)`;
+            ball.style.top = `calc(${ballY}px - ${BALL_SIZE / 2}px)`;
+            
+            const ballImg = document.createElement('img');
+            ballImg.src = appState.field.ball.imageSrc;
+            ballImg.alt = 'Soccer Ball';
+            ballImg.style.width = '100%';
+            ballImg.style.height = '100%';
+            ballImg.style.borderRadius = '50%';
+            ballImg.style.pointerEvents = 'none';
+            ball.appendChild(ballImg);
+
+            area.appendChild(ball);
+
+            appState.teams.forEach((team, teamId) => {
+                const tileSize = team.settings.tileSize || 60;
+                team.tiles.filter(t => t.location === 'field').forEach(tile => {
+                    const el = document.createElement('div');
+                    el.className = 'tile tile-on-field';
+                    el.dataset.teamId = teamId;
+                    el.dataset.tileId = tile.id;
+                    el.style.left = `calc(${tile.x}% - ${tileSize/2}px)`;
+                    el.style.top = `calc(${tile.y}% - ${tileSize/2}px)`;
+                    
+                    const marks = tile.marks;
+                    const s = team.settings;
+
+                    let captainMarkHTML = '';
+                    if (marks.captain > 0) captainMarkHTML = `<div class="mark bg-blue-500">Ⓒ</div>`;
+
+                    let otherMarksHTML = '';
+                    if(marks.yellowCard > 0) otherMarksHTML += `<div class="mark bg-yellow-400 text-black">🟨</div>`;
+                    if(marks.redCard > 0) otherMarksHTML += `<div class="mark bg-red-600">🟥</div>`;
+                    if(marks.goal > 0) otherMarksHTML += `<div class="mark bg-green-500">${'⚽'.repeat(marks.goal)}</div>`;
+                    if(marks.assist > 0) otherMarksHTML += `<div class="mark bg-blue-600 font-bold">${'A'.repeat(marks.assist)}</div>`;
+
+                    let leftMarksHTML = '';
+                    let rightMarksHTML = '';
+
+                    const isHorizontal = appState.field.orientation === 'horizontal';
+                    const attackDir = s.attackDirection;
+                    const flipMarks = isHorizontal && attackDir === 'right';
+
+                    if (flipMarks) {
+                        rightMarksHTML = captainMarkHTML;
+                        leftMarksHTML = otherMarksHTML;
+                    } else {
+                        leftMarksHTML = captainMarkHTML;
+                        rightMarksHTML = otherMarksHTML;
+                    }
+                    
+                    let subMarkHTML = '';
+                    if(marks.substitution > 0) {
+                        const subMarkClass = flipMarks ? 'tile-mark-bottom-right' : 'tile-mark-bottom-left';
+                        subMarkHTML = `<div class="${subMarkClass}"><div class="mark bg-gray-700 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24"><path fill="green" d="M2,19.333L12,4.667L22,19.333H2z"/></svg></div></div>`;
+                    }
+
+                    let arrowHTML = getArrowSVG(s);
+
+                    el.innerHTML = `
+                        <div class="tile-svg-container">
+                            ${createTileSVG(team, tile)}
+                            ${leftMarksHTML ? `<div class="tile-marks-left">${leftMarksHTML}</div>` : ''}
+                            ${rightMarksHTML ? `<div class="tile-marks-right">${rightMarksHTML}</div>` : ''}
+                            ${subMarkHTML}
+                            ${arrowHTML}
+                        </div>
+                        <div class="mt-1 text-center" style="text-shadow: 0 0 3px black;">
+                            ${s.showName ? `<div class="font-semibold" style="color: ${s.nameColor}; font-size: ${s.nameSize}px;">${tile.name}</div>` : ''}
+                            ${s.showAffiliation ? `<div class="text-xs" style="color: ${s.affiliationColor}; font-size: ${s.affiliationSize}px;">${tile.affiliation}</div>` : ''}
+                        </div>
+                    `;
+                    area.appendChild(el);
+                });
+            });
+        }
+        
+        function getArrowSVG(settings) {
+            let rotation = 0;
+            let positionStyle = '';
+            
+            const fieldOrientation = appState.field.orientation;
+            let dir = settings.attackDirection;
+
+            if (dir === 'none') return '';
+            
+            if (fieldOrientation === 'vertical') {
+                if(dir === 'right') dir = 'down';
+                if(dir === 'left') dir = 'up';
+            }
+
+            switch(dir) {
+                case 'up':
+                    rotation = 0;
+                    positionStyle = 'top: -20px; left: 50%; transform: translateX(-50%)';
+                    break;
+                case 'down':
+                    rotation = 180;
+                    positionStyle = 'bottom: -20px; left: 50%; transform: translateX(-50%)';
+                    break;
+                case 'left':
+                    rotation = -90;
+                    positionStyle = 'left: -20px; top: 50%; transform: translateY(-50%)';
+                    break;
+                case 'right':
+                    rotation = 90;
+                    positionStyle = 'right: -20px; top: 50%; transform: translateY(-50%)';
+                    break;
+            }
+            
+            return `<svg width="24" height="24" viewBox="0 0 24 24" style="position: absolute; ${positionStyle} rotate(${rotation}deg);">
+                <path d="M12 2 L2 22 L22 22 Z" fill="${settings.borderColor}" />
+            </svg>`;
+        }
+        
+        function getFieldLinesSVG(w, h) {
+            if (appState.field.orientation === 'vertical') {
+                return `
+                <svg width="${w}" height="${h}" style="position:absolute; top:0; left:0; pointer-events:none;">
+                    <rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <line x1="0" y1="${h/2}" x2="${w}" y2="${h/2}" stroke="var(--line-color)" stroke-width="2"/>
+                    <circle cx="${w/2}" cy="${h/2}" r="${Math.min(w,h) * 0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <circle cx="${w/2}" cy="${h/2}" r="3" fill="var(--line-color)"/>
+                    <rect x="${w*0.2}" y="0" width="${w*0.6}" height="${h*0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <rect x="${w*0.2}" y="${h - h*0.15}" width="${w*0.6}" height="${h*0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <rect x="${w*0.35}" y="0" width="${w*0.3}" height="${h*0.07}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <rect x="${w*0.35}" y="${h-h*0.07}" width="${w*0.3}" height="${h*0.07}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <path d="M${w/2-w*0.15} ${h*0.15} A ${w*0.1} ${w*0.1} 0 0 0 ${w/2+w*0.15} ${h*0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <path d="M${w/2-w*0.15} ${h-h*0.15} A ${w*0.1} ${w*0.1} 0 0 1 ${w/2+w*0.15} ${h-h*0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                </svg>
+                `;
+            } else { // horizontal
+                return `
+                <svg width="${w}" height="${h}" style="position:absolute; top:0; left:0; pointer-events:none;">
+                    <rect x="0" y="0" width="${w}" height="${h}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <line x1="${w/2}" y1="0" x2="${w/2}" y2="${h}" stroke="var(--line-color)" stroke-width="2"/>
+                    <circle cx="${w/2}" cy="${h/2}" r="${Math.min(w,h) * 0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <circle cx="${w/2}" cy="${h/2}" r="3" fill="var(--line-color)"/>
+                    <rect x="0" y="${h*0.2}" width="${w*0.15}" height="${h*0.6}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <rect x="${w - w*0.15}" y="${h*0.2}" width="${w*0.15}" height="${h*0.6}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <rect x="0" y="${h*0.35}" width="${w*0.07}" height="${h*0.3}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <rect x="${w - w*0.07}" y="${h*0.35}" width="${w*0.07}" height="${h*0.3}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <path d="M${w*0.15} ${h/2-h*0.15} A ${h*0.1} ${h*0.1} 0 0 1 ${w*0.15} ${h/2+h*0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                    <path d="M${w-w*0.15} ${h/2-h*0.15} A ${h*0.1} ${h*0.1} 0 0 0 ${w-w*0.15} ${h/2+h*0.15}" fill="none" stroke="var(--line-color)" stroke-width="2"/>
+                </svg>
+                `;
+            }
+        }
+
+        // --- モーダル制御 ---
+        let activeModal = null;
+        let activeModalData = {};
+        let confirmCallback = null;
+
+        function showModal(modalId, data = {}) {
+            activeModal = document.getElementById(modalId);
+            activeModalData = data;
+            activeModal.classList.remove('hidden');
+            activeModal.classList.add('flex');
+            if (modalId === 'team-settings-modal') loadTeamSettings();
+            if (modalId === 'tile-settings-modal') loadTileSettings();
+        }
+        
+        function showConfirmModal(message, callback) {
+            const modal = document.getElementById('confirm-modal');
+            document.getElementById('confirm-modal-message').textContent = message;
+            confirmCallback = callback;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function hideModals() {
+            document.querySelectorAll('.modal-backdrop').forEach(m => {
+                m.classList.add('hidden');
+                m.classList.remove('flex');
+            });
+            activeModal = null;
+            activeModalData = {};
+            confirmCallback = null;
+        }
+
+        document.querySelectorAll('.close-modal-btn').forEach(btn => btn.addEventListener('click', hideModals));
+        document.querySelectorAll('.modal-backdrop').forEach(modal => {
+            modal.addEventListener('click', (e) => { if (e.target === modal) hideModals(); });
+        });
+
+        // --- イベントリスナー ---
+        let wasJustDragged = false;
+
+        function setupEventListeners() {
+            // Top panel buttons
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+                else document.exitFullscreen();
+            });
+            document.getElementById('export-btn').addEventListener('click', () => showModal('export-modal'));
+            document.getElementById('save-btn').addEventListener('click', saveState);
+            document.getElementById('load-btn').addEventListener('click', () => document.getElementById('load-input').click());
+            document.getElementById('load-input').addEventListener('change', loadState);
+            document.getElementById('help-btn').addEventListener('click', () => showModal('help-modal'));
+            document.getElementById('lang-select').addEventListener('change', (e) => {
+                currentLang = e.target.value;
+                appState.lang = currentLang;
+                renderAll();
+            });
+            
+            // Field area
+            const fieldContainer = document.getElementById('field-container');
+            fieldContainer.addEventListener('dblclick', (e) => {
+                if (wasJustDragged) return;
+                const fieldArea = document.getElementById('field-area');
+                if(e.target === fieldContainer || e.target === fieldArea) showModal('field-settings-modal');
+            });
+
+            // Unified Drag & Drop
+            document.addEventListener('mousedown', (e) => handleDragStart(e));
+            window.addEventListener('mousemove', (e) => handleDragMove(e));
+            window.addEventListener('mouseup', (e) => handleDragEnd(e));
+            
+            document.addEventListener('touchstart', (e) => handleDragStart(e.touches[0]), { passive: true });
+            window.addEventListener('touchmove', (e) => {
+                if (dragged.type) {
+                    e.preventDefault();
+                    handleDragMove(e.touches[0]);
+                }
+            }, { passive: false });
+            window.addEventListener('touchend', (e) => handleDragEnd(e.changedTouches[0]));
+
+            // Click and Double Click listeners
+            document.body.addEventListener('click', handleClicks);
+            document.body.addEventListener('dblclick', handleDoubleClicks);
+            
+            setupModalEventListeners();
+        }
+        
+        // --- Dragging Logic (Unified) ---
+        function handleDragStart(e) {
+            if (activeModal || dragged.type) return;
+            const target = e.target;
+            
+            const fieldTile = target.closest('.tile-on-field');
+            const panelTile = target.closest('.tile-on-panel');
+            const ball = target.closest('.soccer-ball');
+
+            if (!fieldTile && !panelTile && !ball) return;
+            
+            dragged.startX = e.clientX;
+            dragged.startY = e.clientY;
+
+            const sourceRect = (fieldTile || panelTile || ball).getBoundingClientRect();
+            dragged.offsetX = e.clientX - sourceRect.left;
+            dragged.offsetY = e.clientY - sourceRect.top;
+
+            if (fieldTile) {
+                dragged.type = 'tile-on-field';
+                dragged.sourceElement = fieldTile;
+                dragged.teamId = fieldTile.dataset.teamId;
+                dragged.tileId = fieldTile.dataset.tileId;
+                const tile = findTile(dragged.teamId, dragged.tileId);
+                if (tile) {
+                    dragged.initialX = tile.x;
+                    dragged.initialY = tile.y;
+                }
+            } else if (ball) {
+                dragged.type = 'ball';
+                dragged.sourceElement = ball;
+                dragged.initialX = appState.field.ball.x;
+                dragged.initialY = appState.field.ball.y;
+            } else if (panelTile) {
+                dragged.type = 'panel-tile';
+                dragged.sourceElement = panelTile;
+                dragged.teamId = panelTile.dataset.teamId;
+                dragged.tileId = panelTile.dataset.tileId;
+
+                const clone = panelTile.cloneNode(true);
+                clone.id = 'drag-clone';
+                clone.style.width = `${sourceRect.width}px`;
+                clone.style.height = `${sourceRect.height}px`;
+                document.body.appendChild(clone);
+                dragged.element = clone;
+                
+                updateDraggedElementPosition(e);
+            }
+        }
+
+        function handleDragMove(e) {
+            if (!dragged.type) return;
+
+            if (!document.body.classList.contains('dragging')) {
+                 const moved = Math.abs(e.clientX - dragged.startX) > 5 || Math.abs(e.clientY - dragged.startY) > 5;
+                 if (moved) {
+                    document.body.classList.add('dragging');
+                    if (dragged.sourceElement) {
+                        dragged.sourceElement.classList.add('dragging-source');
+                    }
+                 }
+            }
+            
+            if (document.body.classList.contains('dragging')) {
+                updateDraggedElementPosition(e);
+                handleDragOver(e);
+            }
+        }
+        
+        function updateDraggedElementPosition(e) {
+             let targetElement = dragged.type === 'panel-tile' ? dragged.element : dragged.sourceElement;
+             if (!targetElement) return;
+
+             if (dragged.type === 'panel-tile') {
+                targetElement.style.left = `${e.clientX - dragged.offsetX}px`;
+                targetElement.style.top = `${e.clientY - dragged.offsetY}px`;
+             } else {
+                const deltaX = e.clientX - dragged.startX;
+                const deltaY = e.clientY - dragged.startY;
+                targetElement.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+             }
+        }
+        
+        function handleDragOver(e) {
+            const placeholder = getOrCreatePlaceholder();
+            if(dragged.element) dragged.element.style.display = 'none';
+            const overElement = document.elementFromPoint(e.clientX, e.clientY);
+            if(dragged.element) dragged.element.style.display = '';
+
+            if (!overElement) return;
+
+            const panel = overElement.closest('.team-panel');
+            if (dragged.type === 'panel-tile' && panel) {
+                const tileList = panel.querySelector('.panel-tile-list');
+                const tiles = Array.from(tileList.querySelectorAll('.tile-on-panel:not(.dragging-source)'));
+                
+                const nextTile = tiles.find(tile => {
+                    const rect = tile.getBoundingClientRect();
+                    return e.clientY < rect.top + rect.height / 2;
+                });
+                
+                if (nextTile) {
+                    tileList.insertBefore(placeholder, nextTile);
+                } else {
+                    tileList.appendChild(placeholder);
+                }
+            } else {
+                placeholder.remove();
+            }
+        }
+        
+        function getOrCreatePlaceholder() {
+            let placeholder = document.querySelector('.drop-placeholder');
+            if (!placeholder) {
+                placeholder = document.createElement('div');
+                placeholder.className = 'drop-placeholder';
+            }
+            return placeholder;
+        }
+
+        function handleDragEnd(e) {
+            if (!dragged.type) {
+                return;
+            }
+
+            const wasDragging = document.body.classList.contains('dragging');
+            
+            // Create a copy of the drag information before resetting state
+            const dropInfo = {
+                type: dragged.type,
+                teamId: dragged.teamId,
+                tileId: dragged.tileId,
+                clientX: e ? e.clientX : dragged.startX,
+                clientY: e ? e.clientY : dragged.startY,
+                offsetX: dragged.offsetX,
+                offsetY: dragged.offsetY,
+            };
+
+            // Reset state first to prevent race conditions with re-rendering
+            resetDraggedState();
+
+            if (wasDragging) {
+                wasJustDragged = true;
+                setTimeout(() => { wasJustDragged = false; }, 100);
+                
+                if (typeof dropInfo.clientX === 'number') {
+                    handleDrop(dropInfo);
+                } else {
+                    renderAll(); 
+                }
+            }
+        }
+
+        function handleDrop(dropInfo) {
+            const { clientX, clientY, type } = dropInfo;
+
+            const fieldArea = document.getElementById('field-area');
+            const teamPanel0 = document.getElementById('team-panel-0');
+            const teamPanel1 = document.getElementById('team-panel-1');
+
+            const fieldRect = fieldArea.getBoundingClientRect();
+            const panel0Rect = teamPanel0.getBoundingClientRect();
+            const panel1Rect = teamPanel1.getBoundingClientRect();
+            
+            let droppedOnValidTarget = false;
+
+            if (clientX >= fieldRect.left && clientX <= fieldRect.right && clientY >= fieldRect.top && clientY <= fieldRect.bottom) {
+                if (['panel-tile', 'ball', 'tile-on-field'].includes(type)) {
+                    dropOnField(dropInfo);
+                    droppedOnValidTarget = true;
+                }
+            } else if (clientX >= panel0Rect.left && clientX <= panel0Rect.right && clientY >= panel0Rect.top && clientY <= panel0Rect.bottom) {
+                if (['panel-tile', 'tile-on-field'].includes(type)) {
+                    dropOnPanel(teamPanel0, dropInfo);
+                    droppedOnValidTarget = true;
+                }
+            } else if (clientX >= panel1Rect.left && clientX <= panel1Rect.right && clientY >= panel1Rect.top && clientY <= panel1Rect.bottom) {
+                if (['panel-tile', 'tile-on-field'].includes(type)) {
+                    dropOnPanel(teamPanel1, dropInfo);
+                    droppedOnValidTarget = true;
+                }
+            }
+
+            if (!droppedOnValidTarget) {
+                 if (type === 'tile-on-field' || type === 'ball') {
+                    // Snap back by re-rendering
+                    renderAll();
+                 } else if (type === 'panel-tile') {
+                     // Tile from panel dropped outside, return it
+                    const tile = findTile(dropInfo.teamId, dropInfo.tileId);
+                    if (tile) {
+                        tile.location = 'panel';
+                    }
+                    renderAll();
+                 }
+            }
+        }
+        
+        function dropOnField(dropInfo) {
+            const { clientX, clientY, type, teamId, tileId, offsetX, offsetY } = dropInfo;
+            const fieldRect = document.getElementById('field-area').getBoundingClientRect();
+            
+            if (type === 'panel-tile' || type === 'tile-on-field') {
+                const tile = findTile(teamId, tileId);
+                if (!tile) return;
+                const team = appState.teams[teamId];
+                const tileSize = team.settings.tileSize || 60;
+                
+                const centerX = clientX - offsetX + tileSize / 2;
+                const centerY = clientY - offsetY + tileSize / 2;
+
+                let x = ((centerX - fieldRect.left) / fieldRect.width) * 100;
+                let y = ((centerY - fieldRect.top) / fieldRect.height) * 100;
+                
+                tile.location = 'field';
+                tile.x = Math.max(0, Math.min(100, x));
+                tile.y = Math.max(0, Math.min(100, y));
+
+            } else if (type === 'ball') {
+                const centerX = clientX - offsetX + BALL_SIZE / 2;
+                const centerY = clientY - offsetY + BALL_SIZE / 2;
+
+                let x = ((centerX - fieldRect.left) / fieldRect.width) * 100;
+                let y = ((centerY - fieldRect.top) / fieldRect.height) * 100;
+
+                 appState.field.ball.x = Math.max(0, Math.min(100, x));
+                 appState.field.ball.y = Math.max(0, Math.min(100, y));
+            }
+            renderAll();
+        }
+        
+        function dropOnPanel(panel, dropInfo) {
+            const { teamId, tileId } = dropInfo;
+            const targetTeamId = panel.dataset.teamId;
+            const tile = findTile(teamId, tileId);
+            if (!tile) return;
+
+            if (targetTeamId !== teamId) {
+                const originalTeam = appState.teams[teamId];
+                const tileIndex = originalTeam.tiles.findIndex(t => t.id === tileId);
+                if (tileIndex > -1) originalTeam.tiles.splice(tileIndex, 1);
+                
+                tile.id = `${targetTeamId}-${Date.now()}`;
+                appState.teams[targetTeamId].tiles.push(tile);
+            }
+            
+            tile.location = 'panel';
+            tile.x = null;
+            tile.y = null;
+            
+            const placeholder = document.querySelector('.drop-placeholder');
+            if (placeholder) {
+                const panelTiles = appState.teams[targetTeamId].tiles.filter(t => t.location === 'panel').sort((a,b) => a.order - b.order);
+                const draggedTileInArray = panelTiles.find(t => t.id === tile.id);
+                const otherTiles = panelTiles.filter(t => t.id !== tile.id);
+                
+                const nextElementId = placeholder.nextElementSibling?.dataset.tileId;
+                let newIndex;
+                if(nextElementId) {
+                    newIndex = otherTiles.findIndex(t => t.id === nextElementId);
+                } else {
+                    newIndex = otherTiles.length;
+                }
+                
+                otherTiles.splice(newIndex, 0, draggedTileInArray);
+                otherTiles.forEach((t, index) => t.order = index);
+            }
+            
+            renderAll();
+        }
+
+
+        // --- Other event handlers ---
+        function handleClicks(e) {
+            if (wasJustDragged) return;
+
+            const teamSettingsBtn = e.target.closest('.team-settings-btn');
+            if (teamSettingsBtn) {
+                showModal('team-settings-modal', { teamId: teamSettingsBtn.dataset.teamId });
+                return;
+            }
+            const addPlayerBtn = e.target.closest('.add-player-btn');
+            if(addPlayerBtn) {
+                const teamId = parseInt(addPlayerBtn.dataset.teamId);
+                const team = appState.teams[teamId];
+                const newNumber = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => parseInt(t.number) || 0)) + 1 : 1;
+                const newOrder = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => t.order)) + 1 : 0;
+                const newId = `${teamId}-${Date.now()}`;
+                team.tiles.push(createDefaultTile(newId, newNumber, newOrder));
+                renderAll();
+                return;
+            }
+            
+            const deleteTileBtn = e.target.closest('.delete-tile-btn');
+             if (deleteTileBtn) {
+                const teamId = deleteTileBtn.dataset.teamId;
+                const tileId = deleteTileBtn.dataset.tileId;
+                const tile = findTile(teamId, tileId);
+                if (tile) {
+                    showConfirmModal(
+                        `${t('confirm_delete_message')} (${tile.name})`,
+                        () => {
+                            const team = appState.teams[teamId];
+                            team.tiles = team.tiles.filter(t => t.id !== tileId);
+                            renderAll();
+                        }
+                    );
+                }
+                return;
+            }
+
+            const sortBtn = e.target.closest('.sort-team-btn');
+            if (sortBtn) {
+                const teamId = parseInt(sortBtn.dataset.teamId, 10);
+                const team = appState.teams[teamId];
+                const currentSort = team.sortState || 'custom';
+                
+                let nextSort;
+                if (currentSort === 'custom') {
+                    nextSort = 'position';
+                } else if (currentSort === 'position') {
+                    nextSort = 'number';
+                } else {
+                    nextSort = 'custom'; 
+                }
+                
+                team.sortState = nextSort;
+                sortTeam(teamId);
+                renderAll();
+                return;
+            }
+
+            const markBtn = e.target.closest('.mark-btn');
+            if (markBtn) {
+                const { teamId, tileId } = activeModalData;
+                const tile = findTile(teamId, tileId);
+                const markType = markBtn.dataset.markType;
+                if(tile && tile.marks.hasOwnProperty(markType)) {
+                    if (['yellowCard', 'redCard', 'captain', 'substitution'].includes(markType)) {
+                        tile.marks[markType] = tile.marks[markType] > 0 ? 0 : 1;
+                    } else if (markType === 'goal') {
+                        tile.marks.goal++;
+                    } else if (markType === 'assist') {
+                        tile.marks.assist++;
+                    }
+                }
+                hideModals();
+                renderAll();
+            }
+            if (e.target.id === 'clear-marks-btn') {
+                const { teamId, tileId } = activeModalData;
+                const tile = findTile(teamId, tileId);
+                if (tile) {
+                   Object.keys(tile.marks).forEach(key => tile.marks[key] = 0);
+                }
+                hideModals();
+                renderAll();
+            }
+        }
+
+        function sortTeam(teamId) {
+            const team = appState.teams[teamId];
+            const tilesToSort = [...team.tiles]; // Create a mutable copy
+            const sortState = team.sortState;
+
+            if (sortState === 'position') {
+                const positionOrder = ['GK', 'DF', 'MF', 'FW', ''];
+                tilesToSort.sort((a, b) => {
+                    const posA = positionOrder.indexOf(a.position);
+                    const posB = positionOrder.indexOf(b.position);
+                    if (posA !== posB) return posA - posB;
+                    
+                    const numA = parseInt(a.number, 10) || 0;
+                    const numB = parseInt(b.number, 10) || 0;
+                    return numA - numB;
+                });
+            } else if (sortState === 'number') {
+                tilesToSort.sort((a, b) => {
+                    let numA = parseInt(a.number, 10);
+                    let numB = parseInt(b.number, 10);
+
+                    if (isNaN(numA)) numA = Infinity;
+                    if (isNaN(numB)) numB = Infinity;
+
+                    if (numA === 0) numA = Infinity;
+                    if (numB === 0) numB = Infinity;
+                    
+                    return numA - numB;
+                });
+            } else { // 'custom'
+                // Revert to original order before any sorting
+                tilesToSort.sort((a, b) => {
+                    const idA = parseInt(a.id.split('-')[1]);
+                    const idB = parseInt(b.id.split('-')[1]);
+                    return idA - idB;
+                });
+            }
+
+            // Update the 'order' property for all tiles based on the new sort.
+            tilesToSort.forEach((sortedTile, index) => {
+                const originalTile = findTile(teamId, sortedTile.id);
+                if (originalTile) originalTile.order = index;
+            });
+        }
+
+
+        function handleDoubleClicks(e) {
+            if (wasJustDragged) return;
+
+            const panelTile = e.target.closest('.tile-on-panel');
+            if (panelTile) {
+                showModal('tile-settings-modal', { teamId: panelTile.dataset.teamId, tileId: panelTile.dataset.tileId });
+                return;
+            }
+
+            const fieldTile = e.target.closest('.tile-on-field');
+            if (fieldTile) {
+                showModal('field-tile-edit-modal', { teamId: fieldTile.dataset.teamId, tileId: fieldTile.dataset.tileId });
+                return;
+            }
+        }
+        
+        function setupModalEventListeners() {
+            document.getElementById('toggle-orientation-btn').addEventListener('click', () => {
+                const oldOrientation = appState.field.orientation;
+                appState.field.orientation = oldOrientation === 'horizontal' ? 'vertical' : 'horizontal';
+                
+                const ball = appState.field.ball;
+                const oldBallX = ball.x;
+                const oldBallY = ball.y;
+                if (oldOrientation === 'horizontal') {
+                    ball.x = 100 - oldBallY;
+                    ball.y = oldBallX;
+                } else {
+                    ball.x = oldBallY;
+                    ball.y = 100 - oldBallX;
+                }
+
+                appState.teams.forEach(team => {
+                    team.tiles.forEach(tile => {
+                        if (tile.location === 'field') {
+                            const oldX = tile.x;
+                            const oldY = tile.y;
+                            if (oldOrientation === 'horizontal') {
+                                tile.x = 100 - oldY;
+                                tile.y = oldX;
+                            } else {
+                                tile.x = oldY;
+                                tile.y = 100 - oldX;
+                            }
+                        }
+                    });
+
+                    const dir = team.settings.attackDirection;
+                    if (appState.field.orientation === 'vertical') {
+                        if (dir === 'left') team.settings.attackDirection = 'up';
+                        if (dir === 'right') team.settings.attackDirection = 'down';
+                    } else {
+                        if (dir === 'up') team.settings.attackDirection = 'left';
+                        if (dir === 'down') team.settings.attackDirection = 'right';
+                    }
+                });
+                renderAll();
+                hideModals();
+            });
+            document.getElementById('swap-sides-btn').addEventListener('click', () => {
+                const ball = appState.field.ball;
+                ball.x = 100 - ball.x;
+                ball.y = 100 - ball.y;
+
+                const swapMap = { left: 'right', right: 'left', up: 'down', down: 'up' };
+                appState.teams.forEach(team => {
+                    team.settings.attackDirection = swapMap[team.settings.attackDirection] || team.settings.attackDirection;
+                    team.tiles.forEach(tile => {
+                        if (tile.location === 'field') {
+                            tile.x = 100 - tile.x;
+                            tile.y = 100 - tile.y;
+                        }
+                    });
+                });
+
+                renderAll();
+                hideModals();
+            });
+            
+            const teamSettingsForm = document.getElementById('team-settings-modal');
+            const colorInputs = ['border-color-input', 'bg-color-input', 'number-color-input', 'name-color-input', 'affiliation-color-input'];
+            
+            teamSettingsForm.addEventListener('input', (e) => {
+                if (!activeModalData.teamId) return;
+                // 色のリアルタイム反映を避ける
+                if (colorInputs.includes(e.target.id)) return;
+
+                const team = appState.teams[activeModalData.teamId];
+                if(!team) return;
+                const s = team.settings;
+                switch(e.target.id) {
+                    case 'team-name-input': team.name = e.target.value; break;
+                    case 'tile-shape-select': s.shape = e.target.value; break;
+                    case 'border-width-input': 
+                        s.borderWidth = parseFloat(e.target.value); 
+                        document.getElementById('border-width-value').textContent = `${s.borderWidth}px`;
+                        break;
+                    case 'number-size-input': 
+                        s.numberSize = parseInt(e.target.value); 
+                        document.getElementById('number-size-value').textContent = `${s.numberSize}px`;
+                        break;
+                    case 'show-name-checkbox': s.showName = e.target.checked; break;
+                    case 'show-affiliation-checkbox': s.showAffiliation = e.target.checked; break;
+                    case 'attack-direction-select': s.attackDirection = e.target.value; break;
+                    case 'tile-size-input': 
+                        s.tileSize = parseInt(e.target.value);
+                        document.getElementById('tile-size-value').textContent = `${s.tileSize}px`;
+                        break;
+                    case 'bg-image-opacity-input': s.bgImageOpacity = parseFloat(e.target.value); break;
+                    case 'name-size-input': 
+                        s.nameSize = parseInt(e.target.value); 
+                        document.getElementById('name-size-value').textContent = `${s.nameSize}px`;
+                        break;
+                    case 'affiliation-size-input': 
+                        s.affiliationSize = parseInt(e.target.value); 
+                        document.getElementById('affiliation-size-value').textContent = `${s.affiliationSize}px`;
+                        break;
+                }
+                renderAll();
+            });
+
+            colorInputs.forEach(id => {
+                document.getElementById(id).addEventListener('change', (e) => {
+                    if (!activeModalData.teamId) return;
+                    const team = appState.teams[activeModalData.teamId];
+                    if (!team) return;
+                    switch(id) {
+                        case 'border-color-input': team.settings.borderColor = e.target.value; break;
+                        case 'bg-color-input': team.settings.bgColor = e.target.value; break;
+                        case 'number-color-input': team.settings.numberColor = e.target.value; break;
+                        case 'name-color-input': team.settings.nameColor = e.target.value; break;
+                        case 'affiliation-color-input': team.settings.affiliationColor = e.target.value; break;
+                    }
+                    renderAll();
+                });
+            });
+
+            const tileSettingsForm = document.getElementById('tile-settings-modal');
+            tileSettingsForm.addEventListener('input', (e) => {
+                 if (!activeModalData.teamId || !activeModalData.tileId) return;
+                 const tile = findTile(activeModalData.teamId, activeModalData.tileId);
+                 if(!tile) return;
+                 switch(e.target.id) {
+                    case 'tile-name-input': tile.name = e.target.value; break;
+                    case 'tile-number-input': tile.number = e.target.value; break;
+                    case 'tile-position-select': tile.position = e.target.value; break;
+                    case 'tile-affiliation-input': tile.affiliation = e.target.value; break;
+                 }
+                 renderAll();
+            });
+            
+            document.getElementById('export-confirm-btn').addEventListener('click', exportImage);
+
+            const bgImageDropArea = document.getElementById('bg-image-drop-area');
+            bgImageDropArea.addEventListener('dragover', (e) => { e.preventDefault(); bgImageDropArea.classList.add('drag-over'); });
+            bgImageDropArea.addEventListener('dragleave', () => bgImageDropArea.classList.remove('drag-over'));
+            bgImageDropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                bgImageDropArea.classList.remove('drag-over');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    const file = e.dataTransfer.files[0];
+                    if (file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (re) => {
+                            const team = appState.teams[activeModalData.teamId];
+                            team.settings.bgImage = re.target.result;
+                            renderAll();
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            });
+            document.getElementById('clear-bg-image-btn').addEventListener('click', () => {
+                 const team = appState.teams[activeModalData.teamId];
+                 team.settings.bgImage = null;
+                 renderAll();
+            });
+
+            const nameListDropArea = document.getElementById('name-list-drop-area');
+            nameListDropArea.addEventListener('dragover', (e) => { e.preventDefault(); nameListDropArea.classList.add('drag-over'); });
+            nameListDropArea.addEventListener('dragleave', () => nameListDropArea.classList.remove('drag-over'));
+            nameListDropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                nameListDropArea.classList.remove('drag-over');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type === 'text/plain') {
+                    const reader = new FileReader();
+                    reader.onload = (re) => {
+                        const teamId = activeModalData.teamId;
+                        const team = appState.teams[teamId];
+                        if (!team) return;
+                        const lines = re.target.result.split(/\r?\n/).filter(line => line.trim());
+                        if (lines.length === 0) return;
+                        let maxOrder = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => t.order)) : -1;
+                        lines.forEach(line => {
+                            let processedLine = line.trim(), affiliation = '', number = '0';
+                            const affiliationMatch = processedLine.match(/\(([^)]+)\)|（([^）]+)）/);
+                            if (affiliationMatch) {
+                                affiliation = affiliationMatch[1] || affiliationMatch[2] || '';
+                                processedLine = processedLine.replace(/\(([^)]+)\)|（([^）]+)）/, '').trim();
+                            }
+                            const numberMatch = processedLine.match(/^\d+\s*/);
+                            if (numberMatch) {
+                                number = numberMatch[0].trim();
+                                processedLine = processedLine.substring(numberMatch[0].length).trim();
+                            }
+                            const name = processedLine || 'Player';
+                            maxOrder++;
+                            const newId = `${teamId}-${Date.now()}-${maxOrder}`;
+                            const newTile = createDefaultTile(newId, number, maxOrder);
+                            newTile.name = name;
+                            newTile.affiliation = affiliation;
+                            team.tiles.push(newTile);
+                        });
+                        renderAll();
+                        hideModals();
+                    };
+                    reader.readAsText(file);
+                } else {
+                    alert('テキストファイル (.txt) をドロップしてください。');
+                }
+            });
+            
+            document.getElementById('change-ball-image-btn').addEventListener('click', () => {
+                document.getElementById('ball-image-input').click();
+            });
+             document.getElementById('ball-image-input').addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        appState.field.ball.imageSrc = e.target.result;
+                        renderAll();
+                    };
+                    reader.readAsDataURL(file);
+                }
+                event.target.value = null; // Reset input
+            });
+            document.getElementById('reset-ball-image-btn').addEventListener('click', () => {
+                appState.field.ball.imageSrc = defaultAppState.field.ball.imageSrc;
+                renderAll();
+            });
+
+            document.getElementById('change-grass-image-btn').addEventListener('click', () => document.getElementById('grass-image-input').click());
+            document.getElementById('grass-image-input').addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => { appState.field.grassImage = e.target.result; renderAll(); };
+                    reader.readAsDataURL(file);
+                }
+                event.target.value = null;
+            });
+            document.getElementById('reset-grass-image-btn').addEventListener('click', () => {
+                appState.field.grassImage = defaultAppState.field.grassImage;
+                renderAll();
+            });
+
+            document.getElementById('confirm-modal-ok-btn').addEventListener('click', () => {
+                if (confirmCallback) confirmCallback();
+                hideModals();
+            });
+            document.getElementById('confirm-modal-cancel-btn').addEventListener('click', hideModals);
+        }
+        
+        function loadTeamSettings() {
+            const team = appState.teams[activeModalData.teamId];
+            if(!team) return;
+            const s = team.settings;
+            document.getElementById('team-name-input').value = team.name;
+            document.getElementById('tile-shape-select').value = s.shape;
+            document.getElementById('border-color-input').value = s.borderColor;
+            document.getElementById('border-width-input').value = s.borderWidth;
+            document.getElementById('border-width-value').textContent = `${s.borderWidth}px`;
+            document.getElementById('bg-color-input').value = s.bgColor;
+            document.getElementById('number-color-input').value = s.numberColor;
+            document.getElementById('number-size-input').value = s.numberSize;
+            document.getElementById('number-size-value').textContent = `${s.numberSize}px`;
+            document.getElementById('show-name-checkbox').checked = s.showName;
+            document.getElementById('show-affiliation-checkbox').checked = s.showAffiliation;
+            const tileSize = s.tileSize || 60;
+            const tileSizeValue = document.getElementById('tile-size-value');
+            document.getElementById('tile-size-input').value = tileSize;
+            if(tileSizeValue) tileSizeValue.textContent = `${tileSize}px`;
+            document.getElementById('bg-image-opacity-input').value = s.bgImageOpacity || 1;
+            
+            document.getElementById('name-color-input').value = s.nameColor;
+            document.getElementById('name-size-input').value = s.nameSize;
+            document.getElementById('name-size-value').textContent = `${s.nameSize}px`;
+            document.getElementById('affiliation-color-input').value = s.affiliationColor;
+            document.getElementById('affiliation-size-input').value = s.affiliationSize;
+            document.getElementById('affiliation-size-value').textContent = `${s.affiliationSize}px`;
+
+            const select = document.getElementById('attack-direction-select');
+            const validOptions = { horizontal: ['left', 'right', 'none'], vertical: ['up', 'down', 'none'] }[appState.field.orientation];
+            Array.from(select.options).forEach(opt => { opt.hidden = !validOptions.includes(opt.value); });
+            if (!validOptions.includes(s.attackDirection)) { team.settings.attackDirection = validOptions[0]; }
+            select.value = team.settings.attackDirection;
+        }
+
+        function loadTileSettings() {
+             const tile = findTile(activeModalData.teamId, activeModalData.tileId);
+             if(!tile) return;
+             document.getElementById('tile-name-input').value = tile.name;
+             document.getElementById('tile-number-input').value = tile.number;
+             document.getElementById('tile-position-select').value = tile.position;
+             document.getElementById('tile-affiliation-input').value = tile.affiliation;
+        }
+
+        function findTile(teamId, tileId) {
+            return appState.teams[teamId]?.tiles.find(t => t.id === tileId);
+        }
+
+        // --- データ永続化 ---
+        function saveState() {
+            const dataStr = JSON.stringify(appState, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const date = new Date();
+            a.href = url;
+            a.download = `formation_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function loadState(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const newState = JSON.parse(e.target.result);
+                        if (newState.teams && newState.field) {
+                            appState = newState;
+                            appState.teams.forEach(team => {
+                                if (!team.sortState) {
+                                    team.sortState = 'custom';
+                                }
+                            });
+                            // Add a check for old save files
+                            if (appState.field.ball && !appState.field.ball.imageSrc) {
+                                appState.field.ball.imageSrc = './images/soccer_ball.jpg';
+                            }
+                            currentLang = appState.lang || 'ja';
+                            document.getElementById('lang-select').value = currentLang;
+                            renderAll();
+                        } else { alert('Invalid file format.'); }
+                    } catch (err) { alert('Error reading file: ' + err.message); }
+                };
+                reader.readAsText(file);
+                event.target.value = null;
+            }
+        }
+        
+        // --- 画像出力 ---
+        async function exportImage() {
+            const area = document.getElementById('export-area-select').value;
+            const width = parseInt(document.getElementById('export-width-input').value) || 1920;
+            const spinner = document.getElementById('export-spinner');
+            
+            spinner.classList.remove('hidden');
+            const targetElement = area === 'field' ? document.getElementById('field-area') : document.querySelector('.flex-1.overflow-hidden');
+            
+            try {
+                const canvas = await html2canvas(targetElement, {
+                     scale: 2,
+                     backgroundColor: area === 'field' ? null : '#1f2937',
+                     useCORS: true,
+                });
+                
+                const aspect = canvas.width / canvas.height;
+                const resizedCanvas = document.createElement('canvas');
+                resizedCanvas.width = width;
+                resizedCanvas.height = width / aspect;
+                const ctx = resizedCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
+
+                const dataUrl = resizedCanvas.toDataURL('image/jpeg', 0.9);
+                const a = document.createElement('a');
+                const date = new Date();
+                a.href = dataUrl;
+                a.download = `formation_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.jpeg`;
+                a.click();
+            } catch(e) {
+                console.error('Image export failed:', e);
+                alert('Image export failed. See console for details.');
+            } finally {
+                spinner.classList.add('hidden');
+                hideModals();
+            }
+        }
+
+        // --- 初期化処理 ---
+        initializeState();
+        renderAll();
+        setupEventListeners();
+        
+        new ResizeObserver(renderAll).observe(document.getElementById('field-container'));
+    });
+    </script>
+</body>
+</html>
+
