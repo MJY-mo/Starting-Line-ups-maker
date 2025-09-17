@@ -132,9 +132,9 @@
         .drop-area {
              border: 2px dashed #ccc;
         }
-        .drop-area.drag-over {
+        .drop-area.drag-over, .panel-tile-list.drag-over {
             border-color: #3498db;
-            background-color: #f0f8ff;
+            background-color: rgba(52, 152, 219, 0.1);
         }
         .drop-placeholder {
             height: 50px;
@@ -163,7 +163,7 @@
                 <button id="load-all-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="load_all_data_title"><i class="fas fa-folder-open"></i> <span data-lang="load_all_data">全体呼出</span></button>
                 <input type="file" id="load-all-input" class="hidden" accept=".json">
             </div>
-            <button id="help-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="help_title"><i class="fas fa-question-circle"></i></button>
+            <button id="help-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="help_title"><i class="fas fa-question-circle mr-1"></i><span data-lang="help"></span></button>
             <select id="lang-select" class="bg-gray-700 text-white p-2 rounded-lg">
                 <option value="ja">日本語</option>
                 <option value="en">English</option>
@@ -453,63 +453,101 @@
                 <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
             </div>
             <div class="prose prose-invert max-w-none space-y-4 help-content" data-lang-content="ja">
-                <h4>基本操作</h4>
+                <h4>1. 選手リストの作成と編集</h4>
                 <ul>
-                    <li><strong>タイルの移動:</strong> サイドパネルのタイルをドラッグしてフィールドに配置します。フィールドからサイドパネルに戻すことも可能です。</li>
-                    <li><strong>タイルの並び替え:</strong> サイドパネル内でタイルをドラッグ＆ドロップすると、選手の順番を自由に入れ替えられます。また、チーム名横の整列ボタン <i class="fas fa-sort"></i> をクリックすると、「ポジション順」→「背番号順」→「カスタム（手動整列）順」に自動で並び替えができます。</li>
-                    <li><strong>選手の削除:</strong> サイドパネルの選手タイルにカーソルを合わせると右上に表示される「×」ボタンで選手を削除できます。</li>
-                    <li><strong>ボールの移動:</strong> フィールド中央のサッカーボールをドラッグして移動できます。</li>
-                </ul>
-                <h4>各種設定</h4>
-                <ul>
-                    <li><strong>テキストファイルから選手を一括登録:</strong> チーム設定モーダル内で、選手名が一行ずつ書かれたテキストファイル（.txt）をドラッグ＆ドロップすると、選手を一括で登録できます。ファイルは以下の形式で解析されます：
+                    <li><strong>選手の一括登録:</strong>
                         <ul>
-                            <li><code>背番号 選手名 (所属)</code> の形式で書かれている行を解釈します。</li>
-                            <li>行頭の数字を「背番号」、丸括弧<code>()</code>で囲まれた部分を「所属」として自動で設定します。</li>
-                            <li>背番号や所属は省略可能です。例: <code>選手名のみ</code></li>
+                            <li>選手名が一行ずつ書かれたテキストファイル(.txt)やテキストそのものを、サイドパネルの選手リストエリアに直接ドラッグ＆ドロップすると、選手を一括登録できます。</li>
+                            <li><code>背番号 選手名 (所属)</code> の形式で解釈されます。背番号や所属は省略可能です。</li>
                         </ul>
                     </li>
-                    <li><strong>フィールド設定:</strong> フィールドエリアをダブルクリックすると、コートの縦横表示や反転、ボールや芝生の画像を変更できます。</li>
-                    <li><strong>チーム設定:</strong> チーム名横の歯車アイコン <i class="fas fa-cog"></i> をクリックすると、チーム名、タイルの形状や色、選手の表示設定などを変更できます。</li>
-                    <li><strong>個別タイル設定:</strong> サイドパネルのタイルをダブルクリックすると、選手名や背番号、ポジションなどを個別に設定できます。</li>
-                    <li><strong>マーク編集:</strong> フィールド上のタイルをダブルクリックすると、キャプテンマークやカード、得点などのマークを付けられます。</li>
+                    <li><strong>選手の個別操作:</strong>
+                        <ul>
+                            <li><strong>追加:</strong> チーム名横の <i class="fas fa-plus-circle"></i> ボタンをクリックします。</li>
+                            <li><strong>編集:</strong> サイドパネルの選手タイルをダブルクリックすると、名前、背番号、ポジション、所属を個別に編集できます。</li>
+                            <li><strong>削除:</strong> 選手タイルにカーソルを合わせると表示される「×」ボタンで削除できます。</li>
+                            <li><strong>全選手削除:</strong> チーム名横の <i class="fas fa-trash"></i> ボタンでチームの全選手を削除します。</li>
+                        </ul>
+                    </li>
+                    <li><strong>選手の並び替え:</strong>
+                        <ul>
+                            <li><strong>手動:</strong> サイドパネル内で選手タイルをドラッグ＆ドロップします。</li>
+                            <li><strong>自動:</strong> チーム名横の <i class="fas fa-sort"></i> ボタンで「ポジション」→「背番号」→「カスタム(手動)」の順に整列します。</li>
+                        </ul>
+                    </li>
+                    <li><strong>チーム全体の設定:</strong>
+                        <ul>
+                            <li>チーム名横の <i class="fas fa-cog"></i> ボタンから、チーム名、タイルの形状・色・サイズ、枠線、背番号や選手名の表示設定などを一括で変更できます。</li>
+                        </ul>
+                    </li>
                 </ul>
-                <h4>トップメニュー</h4>
+
+                <h4>2. フィールドの操作とタイルの編集</h4>
                 <ul>
-                    <li><strong><i class="fas fa-expand"></i> 全画面表示:</strong> アプリを全画面で表示します。</li>
-                    <li><strong><i class="fas fa-camera"></i> 画像出力:</strong> 表示されているフォーメーションをJPEG画像として保存します。</li>
-                    <li><strong><i class="fas fa-save"></i> 保存:</strong> 現在の状態を設定ファイル(.json)としてダウンロードします。</li>
-                    <li><strong><i class="fas fa-folder-open"></i> 呼出:</strong> 保存した設定ファイルを読み込み、状態を復元します。</li>
+                    <li><strong>タイルの配置:</strong> サイドパネルの選手タイルをドラッグしてフィールドに配置します。フィールド内外への移動は自由です。</li>
+                    <li><strong>ボールの移動:</strong> フィールド上のサッカーボールをドラッグして移動できます。</li>
+                    <li><strong>タイルマークの編集:</strong> フィールド上の選手タイルをダブルクリックすると、キャプテンマーク(Ⓒ)、カード(🟨🟥)、ゴール(⚽)などのマークを付けられます。</li>
+                    <li><strong>フィールド設定:</strong> フィールドエリアをダブルクリックすると、コートの縦横切替、ピッチ反転、ボールや芝生の画像を変更できます。</li>
+                </ul>
+
+                <h4>3. 保存と出力</h4>
+                <ul>
+                    <li><strong>画像出力:</strong> トップメニューの <i class="fas fa-camera"></i> ボタンから、表示されている画面全体またはフィールドのみを画像(JPEG)として保存できます。</li>
+                    <li><strong>データ保存・呼出:</strong>
+                        <ul>
+                            <li><strong>チーム別:</strong> サイドパネルの <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> ボタンから、そのチームの選手リストと設定を保存・呼出できます。</li>
+                            <li><strong>全体:</strong> トップメニューの <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> ボタンから、両チームとフィールドの状態をすべて含んだ全体のデータを保存・呼出できます。</li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
              <div class="prose prose-invert max-w-none space-y-4 help-content" data-lang-content="en" style="display: none;">
-                <h4>Basic Controls</h4>
+                <h4>1. Creating and Editing Player Lists</h4>
                 <ul>
-                    <li><strong>Move Tiles:</strong> Drag tiles from the side panel to place them on the field. You can also drag them back from the field to the panel.</li>
-                    <li><strong>Reorder Tiles:</strong> Drag and drop tiles within the side panel to reorder the players manually. You can also click the sort icon <i class="fas fa-sort"></i> next to the team name to automatically sort by "Position" -> "Number" -> "Custom" (manual order).</li>
-                    <li><strong>Delete Player:</strong> Hover over a player tile in the side panel and click the '×' button that appears in the top-right corner to delete the player.</li>
-                    <li><strong>Move Ball:</strong> Drag the soccer ball in the center of the field to move it.</li>
-                </ul>
-                <h4>Settings</h4>
-                 <ul>
-                    <li><strong>Bulk Register from Text File:</strong> In the team settings modal, you can drag and drop a text file (.txt) with one player name per line to register players in bulk. The file is parsed as follows:
+                    <li><strong>Bulk Player Registration:</strong>
                         <ul>
-                            <li>It interprets lines in the format: <code>Number Player Name (Affiliation)</code>.</li>
-                            <li>Numbers at the start of a line are set as the "Jersey Number", and text within parentheses <code>()</code> is set as the "Affiliation".</li>
-                            <li>Both number and affiliation are optional. E.g., <code>Player Name only</code></li>
+                            <li>Drag and drop a text file (.txt) or plain text with one player per line directly onto the player list area in the side panel.</li>
+                            <li>Lines are interpreted in the format: <code>Number Player Name (Affiliation)</code>. Both number and affiliation are optional.</li>
                         </ul>
                     </li>
-                    <li><strong>Field Settings:</strong> Double-click the field area to toggle orientation, flip the pitch, and change the ball/grass image.</li>
-                    <li><strong>Team Settings:</strong> Click the gear icon <i class="fas fa-cog"></i> next to the team name to change the team name, tile shape, colors, player display settings, and more.</li>
-                    <li><strong>Individual Tile Settings:</strong> Double-click a tile in the side panel to set the player's name, number, position etc.</li>
-                    <li><strong>Edit Marks:</strong> Double-click a tile on the field to add marks like captain, cards, goals, etc.</li>
+                    <li><strong>Individual Player Actions:</strong>
+                        <ul>
+                            <li><strong>Add:</strong> Click the <i class="fas fa-plus-circle"></i> icon next to the team name.</li>
+                            <li><strong>Edit:</strong> Double-click a player tile in the side panel to edit their name, number, position, and affiliation.</li>
+                            <li><strong>Delete:</strong> Hover over a player tile and click the '×' button that appears.</li>
+                            <li><strong>Clear All Players:</strong> Click the <i class="fas fa-trash"></i> icon to delete all players from the team.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Reordering Players:</strong>
+                        <ul>
+                            <li><strong>Manual:</strong> Drag and drop player tiles within the side panel.</li>
+                            <li><strong>Automatic:</strong> Click the <i class="fas fa-sort"></i> icon to sort by "Position" -> "Number" -> "Custom (manual)".</li>
+                        </ul>
+                    </li>
+                    <li><strong>Team-wide Settings:</strong>
+                        <ul>
+                            <li>Click the <i class="fas fa-cog"></i> icon to change the team name, tile shape, colors, size, borders, and display settings for names and numbers.</li>
+                        </ul>
+                    </li>
                 </ul>
-                <h4>トップメニュー</h4>
+
+                <h4>2. Field Operations and Tile Editing</h4>
                 <ul>
-                    <li><strong><i class="fas fa-expand"></i> Fullscreen:</strong> Display the application in fullscreen mode.</li>
-                    <li><strong><i class="fas fa-camera"></i> Export Image:</strong> Save the current formation as a JPEG image.</li>
-                    <li><strong><i class="fas fa-save"></i> Save:</strong> Download the current state as a configuration file (.json).</li>
-                    <li><strong><i class="fas fa-folder-open"></i> Load:</strong> Load a saved configuration file to restore the state.</li>
+                    <li><strong>Placing Tiles:</strong> Drag player tiles from the side panel onto the field. You can move them freely between the field and the panel.</li>
+                    <li><strong>Moving the Ball:</strong> Drag the soccer ball on the field to position it.</li>
+                    <li><strong>Editing Tile Marks:</strong> Double-click a player tile on the field to add marks like captain (Ⓒ), cards (🟨🟥), goals (⚽), etc.</li>
+                    <li><strong>Field Settings:</strong> Double-click the field area to toggle orientation, flip the pitch, and change the ball or grass images.</li>
+                </ul>
+
+                <h4>3. Saving and Exporting</h4>
+                <ul>
+                    <li><strong>Export as Image:</strong> Click the <i class="fas fa-camera"></i> icon in the top menu to save the entire screen or just the field as a JPEG image.</li>
+                    <li><strong>Save/Load Data:</strong>
+                        <ul>
+                            <li><strong>By Team:</strong> Use the <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> icons in the side panel to save or load a specific team's roster and settings.</li>
+                            <li><strong>All Data:</strong> Use the <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> icons in the top menu to save or load the entire state, including both teams and the field setup.</li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -559,6 +597,8 @@
                 player_name_size: "選手名の文字サイズ",
                 affiliation_color: "所属の色",
                 affiliation_size: "所属の文字サイズ",
+                clear_all_players: "全選手を消去",
+                confirm_clear_all_players_message: "本当にこのチームの全選手を削除しますか？"
             },
             en: {
                 app_title: "Formation Board", export_image: "Export Image", save_all_data: "Save All", load_all_data: "Load All",
@@ -582,6 +622,8 @@
                 player_name_size: "Player Name Size",
                 affiliation_color: "Affiliation Color",
                 affiliation_size: "Affiliation Size",
+                clear_all_players: "Clear All Players",
+                confirm_clear_all_players_message: "Are you sure you want to delete all players from this team?"
             }
         };
 
@@ -789,11 +831,12 @@
                     <div class="flex items-center justify-between mb-2">
                         <h2 class="text-lg font-bold truncate">${team.name}</h2>
                         <div class="flex items-center">
+                           <button class="team-settings-btn p-1 hover:text-yellow-400" data-team-id="${teamId}" title="${t('team_settings')}"><i class="fas fa-cog"></i></button>
                            <button class="save-team-btn p-1 hover:text-green-400" data-team-id="${teamId}" title="${t('save_team')}"><i class="fas fa-save"></i></button>
                            <button class="load-team-btn p-1 hover:text-blue-400" data-team-id="${teamId}" title="${t('load_team')}"><i class="fas fa-folder-open"></i></button>
                            <button class="sort-team-btn p-1 hover:text-blue-400" data-team-id="${teamId}" title="${t('sort_players')}"><i class="fas fa-sort"></i></button>
-                           <button class="team-settings-btn p-1 hover:text-yellow-400" data-team-id="${teamId}" title="${t('team_settings')}"><i class="fas fa-cog"></i></button>
                            <button class="add-player-btn p-1 hover:text-green-400" data-team-id="${teamId}" title="${t('add_player')}"><i class="fas fa-plus-circle"></i></button>
+                           <button class="clear-players-btn p-1 hover:text-red-400" data-team-id="${teamId}" title="${t('clear_all_players')}"><i class="fas fa-trash"></i></button>
                         </div>
                     </div>
                 `;
@@ -1084,6 +1127,43 @@
             document.body.addEventListener('click', handleClicks);
             document.body.addEventListener('dblclick', handleDoubleClicks);
             
+            // Panel Drop for player list
+            document.body.addEventListener('dragover', (e) => {
+                const panelList = e.target.closest('.panel-tile-list');
+                if (!dragged.type && panelList) {
+                    e.preventDefault();
+                    panelList.classList.add('drag-over');
+                }
+            });
+
+            document.body.addEventListener('dragleave', (e) => {
+                 const panelList = e.target.closest('.panel-tile-list');
+                 if (panelList) {
+                     panelList.classList.remove('drag-over');
+                 }
+            });
+            
+            document.body.addEventListener('drop', (e) => {
+                const panelList = e.target.closest('.panel-tile-list');
+                if (!dragged.type && panelList) {
+                    e.preventDefault();
+                    panelList.classList.remove('drag-over');
+                    const teamId = panelList.closest('.team-panel').dataset.teamId;
+
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type === 'text/plain') {
+                        const reader = new FileReader();
+                        reader.onload = (re) => processPlayerList(re.target.result, teamId);
+                        reader.readAsText(file);
+                    } else {
+                        const text = e.dataTransfer.getData('text/plain');
+                        if (text) {
+                            processPlayerList(text, teamId);
+                        }
+                    }
+                }
+            });
+
             setupModalEventListeners();
         }
         
@@ -1398,6 +1478,22 @@
                 return;
             }
 
+            const clearPlayersBtn = e.target.closest('.clear-players-btn');
+            if (clearPlayersBtn) {
+                const teamId = clearPlayersBtn.dataset.teamId;
+                const team = appState.teams[teamId];
+                if (team) {
+                    showConfirmModal(
+                        `${t('confirm_clear_all_players_message')} (${team.name})`,
+                        () => {
+                            team.tiles = [];
+                            renderAll();
+                        }
+                    );
+                }
+                return;
+            }
+
             const sortBtn = e.target.closest('.sort-team-btn');
             if (sortBtn) {
                 const teamId = parseInt(sortBtn.dataset.teamId, 10);
@@ -1523,6 +1619,35 @@
             }
         }
         
+        function processPlayerList(text, teamId) {
+            const team = appState.teams[teamId];
+            if (!team) return;
+            const lines = text.split(/\r?\n/).filter(line => line.trim());
+            if (lines.length === 0) return;
+            let maxOrder = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => t.order)) : -1;
+            lines.forEach(line => {
+                let processedLine = line.trim(), affiliation = '', number = '';
+                const affiliationMatch = processedLine.match(/\(([^)]+)\)|（([^）]+)）/);
+                if (affiliationMatch) {
+                    affiliation = affiliationMatch[1] || affiliationMatch[2] || '';
+                    processedLine = processedLine.replace(/\(([^)]+)\)|（([^）]+)）/, '').trim();
+                }
+                const numberMatch = processedLine.match(/^\d+\s*/);
+                if (numberMatch) {
+                    number = numberMatch[0].trim();
+                    processedLine = processedLine.substring(numberMatch[0].length).trim();
+                }
+                const name = processedLine || 'Player';
+                maxOrder++;
+                const newId = `${teamId}-${Date.now()}-${maxOrder}`;
+                const newTile = createDefaultTile(newId, number, maxOrder);
+                newTile.name = name;
+                newTile.affiliation = affiliation;
+                team.tiles.push(newTile);
+            });
+            renderAll();
+        }
+
         function setupModalEventListeners() {
             document.getElementById('toggle-orientation-btn').addEventListener('click', () => {
                 const oldOrientation = appState.field.orientation;
@@ -1691,42 +1816,22 @@
             nameListDropArea.addEventListener('drop', (e) => {
                 e.preventDefault();
                 nameListDropArea.classList.remove('drag-over');
+                const teamId = activeModalData.teamId;
+
                 const file = e.dataTransfer.files[0];
                 if (file && file.type === 'text/plain') {
                     const reader = new FileReader();
                     reader.onload = (re) => {
-                        const teamId = activeModalData.teamId;
-                        const team = appState.teams[teamId];
-                        if (!team) return;
-                        const lines = re.target.result.split(/\r?\n/).filter(line => line.trim());
-                        if (lines.length === 0) return;
-                        let maxOrder = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => t.order)) : -1;
-                        lines.forEach(line => {
-                            let processedLine = line.trim(), affiliation = '', number = '0';
-                            const affiliationMatch = processedLine.match(/\(([^)]+)\)|（([^）]+)）/);
-                            if (affiliationMatch) {
-                                affiliation = affiliationMatch[1] || affiliationMatch[2] || '';
-                                processedLine = processedLine.replace(/\(([^)]+)\)|（([^）]+)）/, '').trim();
-                            }
-                            const numberMatch = processedLine.match(/^\d+\s*/);
-                            if (numberMatch) {
-                                number = numberMatch[0].trim();
-                                processedLine = processedLine.substring(numberMatch[0].length).trim();
-                            }
-                            const name = processedLine || 'Player';
-                            maxOrder++;
-                            const newId = `${teamId}-${Date.now()}-${maxOrder}`;
-                            const newTile = createDefaultTile(newId, number, maxOrder);
-                            newTile.name = name;
-                            newTile.affiliation = affiliation;
-                            team.tiles.push(newTile);
-                        });
-                        renderAll();
+                        processPlayerList(re.target.result, teamId);
                         hideModals();
                     };
                     reader.readAsText(file);
                 } else {
-                    alert('テキストファイル (.txt) をドロップしてください。');
+                    const text = e.dataTransfer.getData('text/plain');
+                    if(text) {
+                        processPlayerList(text, teamId);
+                        hideModals();
+                    }
                 }
             });
             
