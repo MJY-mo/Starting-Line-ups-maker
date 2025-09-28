@@ -413,11 +413,8 @@
                 <ul>
                     <li><strong>選手の一括登録:</strong>
                         <ul>
-                            <li>各行から「背番号」「ポジション」「所属」「名前」が自動で解釈されます。順番は自由で、省略も可能です。</li>
-                            <li><strong>所属:</strong> <code>(Aチーム)</code> のように括弧で囲んでください。</li>
-                            <li><strong>ポジション:</strong> <code>GK, DF, MF, FW</code> の大文字が認識されます。</li>
-                            <li><strong>背番号:</strong> 1〜3桁の数字が認識されます。行内に複数ある場合は最初の数字が優先されます。</li>
-                            <li><strong>例:</strong> <code>DF 5 長友 佑都 (インテル)</code></li>
+                            <li><code>背番号 選手名 ポジション (所属)</code> の形式で解釈されます。背番号、ポジション(FW/MF/DF/GK)、所属はそれぞれ省略可能です。</li>
+                            <li>テキストファイル(.txt)やテキストそのものを、サイドパネルの選手リストエリアに直接ドラッグ＆ドロップすると、選手を一括登録できます。</li>
                         </ul>
                     </li>
                     <li><strong>選手の個別操作:</strong>
@@ -464,11 +461,8 @@
                 <ul>
                     <li><strong>Bulk Player Registration:</strong>
                         <ul>
-                            <li>"Number", "Position", "Affiliation", and "Name" are automatically interpreted from each line. The order is flexible, and items can be omitted.</li>
-                            <li><strong>Affiliation:</strong> Enclose in parentheses, like <code>(Team A)</code>.</li>
-                            <li><strong>Position:</strong> Recognizes <code>GK, DF, MF, FW</code> (uppercase).</li>
-                            <li><strong>Number:</strong> Recognizes 1 to 3-digit numbers. If multiple numbers exist, the first one is used.</li>
-                            <li><strong>Example:</strong> <code>DF 5 John Doe (Team A)</code></li>
+                           <li>Lines are interpreted in the format: <code>Number Player Name Position (Affiliation)</code>. Number, Position (FW/MF/DF/GK), and Affiliation are optional.</li>
+                           <li>Drag and drop a text file (.txt) or plain text with one player per line directly onto the player list area in the side panel.</li>
                         </ul>
                     </li>
                     <li><strong>Individual Player Actions:</strong>
@@ -1637,36 +1631,35 @@
             const lines = text.split(/\r?\n/).filter(line => line.trim());
             if (lines.length === 0) return;
             let maxOrder = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => t.order)) : -1;
-            
             lines.forEach(line => {
-                let processedLine = line.trim();
-                let affiliation = '', 
-                    position = '',
-                    number = '';
+                let processedLine = line.trim(), 
+                    affiliation = '', 
+                    number = '',
+                    position = '';
 
-                // 1. 所属を抽出
+                // 1. Extract Affiliation
                 const affiliationMatch = processedLine.match(/\(([^)]+)\)|（([^）]+)）/);
                 if (affiliationMatch) {
                     affiliation = affiliationMatch[1] || affiliationMatch[2] || '';
                     processedLine = processedLine.replace(affiliationMatch[0], '').trim();
                 }
-                
-                // 2. ポジションを抽出
-                const positionMatch = processedLine.match(/\b(GK|DF|MF|FW)\b/);
+
+                // 2. Extract Position
+                const positionMatch = processedLine.match(/\b(FW|MF|DF|GK)\b/);
                 if (positionMatch) {
-                    position = positionMatch[1];
+                    position = positionMatch[0];
                     processedLine = processedLine.replace(positionMatch[0], '').trim();
                 }
-                
-                // 3. 背番号を抽出 (1-3桁)
-                const numberMatch = processedLine.match(/\b(\d{1,3})\b/);
+
+                // 3. Extract Number
+                const numberMatch = processedLine.match(/^\d+\s*/);
                 if (numberMatch) {
-                    number = numberMatch[1];
-                    processedLine = processedLine.replace(new RegExp('\\b' + numberMatch[0] + '\\b'), '').trim();
+                    number = numberMatch[0].trim();
+                    processedLine = processedLine.substring(numberMatch[0].length).trim();
                 }
-                
-                // 4. 残りを名前に (連続する空白は一つにまとめる)
-                const name = processedLine.replace(/\s{2,}/g, ' ').trim() || 'Player';
+
+                // 4. The rest is the name
+                const name = processedLine.trim() || 'Player';
                 
                 maxOrder++;
                 const newId = `${teamId}-${Date.now()}-${maxOrder}`;
@@ -1679,61 +1672,71 @@
             renderAll();
         }
 
+
         function setupModalEventListeners() {
             document.getElementById('toggle-orientation-btn').addEventListener('click', () => {
                 const oldOrientation = appState.field.orientation;
                 appState.field.orientation = oldOrientation === 'horizontal' ? 'vertical' : 'horizontal';
                 
                 const ball = appState.field.ball;
-                const oldBallX = ball.x;
-                const oldBallY = ball.y;
-                if (oldOrientation === 'horizontal') {
-                    ball.x = 100 - oldBallY;
-                    ball.y = oldBallX;
-                } else {
+                const oldBallX = parseFloat(ball.x);
+                const oldBallY = parseFloat(ball.y);
+                
+                // 90度反時計回りに回転
+                if (oldOrientation === 'horizontal') { // H -> V
                     ball.x = oldBallY;
                     ball.y = 100 - oldBallX;
+                } else { // V -> H
+                    ball.x = 100 - oldBallY;
+                    ball.y = oldBallX;
                 }
 
                 appState.teams.forEach(team => {
                     team.tiles.forEach(tile => {
                         if (tile.location === 'field') {
-                            const oldX = tile.x;
-                            const oldY = tile.y;
-                            if (oldOrientation === 'horizontal') {
-                                tile.x = 100 - oldY;
-                                tile.y = oldX;
-                            } else {
+                            const oldX = parseFloat(tile.x);
+                            const oldY = parseFloat(tile.y);
+                            if (oldOrientation === 'horizontal') { // H -> V
                                 tile.x = oldY;
                                 tile.y = 100 - oldX;
+                            } else { // V -> H
+                                tile.x = 100 - oldY;
+                                tile.y = oldX;
                             }
                         }
                     });
 
                     const dir = team.settings.attackDirection;
                     if (appState.field.orientation === 'vertical') {
-                        if (dir === 'left') team.settings.attackDirection = 'up';
-                        if (dir === 'right') team.settings.attackDirection = 'down';
+                        if (dir === 'left') team.settings.attackDirection = 'down';
+                        if (dir === 'right') team.settings.attackDirection = 'up';
                     } else {
-                        if (dir === 'up') team.settings.attackDirection = 'left';
-                        if (dir === 'down') team.settings.attackDirection = 'right';
+                        if (dir === 'up') team.settings.attackDirection = 'right';
+                        if (dir === 'down') team.settings.attackDirection = 'left';
                     }
                 });
                 renderAll();
                 hideModals();
             });
+
             document.getElementById('swap-sides-btn').addEventListener('click', () => {
                 const ball = appState.field.ball;
-                ball.x = 100 - ball.x;
-                ball.y = 100 - ball.y;
+
+                // 180度回転させるため、XとYの両方の座標を反転
+                ball.x = 100 - parseFloat(ball.x);
+                ball.y = 100 - parseFloat(ball.y);
 
                 const swapMap = { left: 'right', right: 'left', up: 'down', down: 'up' };
+
                 appState.teams.forEach(team => {
+                    // 攻める方向も上下左右を反転
                     team.settings.attackDirection = swapMap[team.settings.attackDirection] || team.settings.attackDirection;
+                    
                     team.tiles.forEach(tile => {
                         if (tile.location === 'field') {
-                            tile.x = 100 - tile.x;
-                            tile.y = 100 - tile.y;
+                            // タイルのXとYの両方の座標を反転
+                            tile.x = 100 - parseFloat(tile.x);
+                            tile.y = 100 - parseFloat(tile.y);
                         }
                     });
                 });
@@ -2055,4 +2058,7 @@
     </script>
 </body>
 </html>
+
+
+
 
