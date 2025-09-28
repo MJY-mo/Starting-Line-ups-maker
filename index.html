@@ -6,7 +6,6 @@
     <title>放り込みフォーメーション表</title>
     <link rel="icon" href="favicon15.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -58,38 +57,28 @@
         .tile-svg-container {
             position: relative;
         }
-        .tile-marks-right {
-            position: absolute;
-            top: 0;
-            right: -18px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            align-items: center;
-        }
-        .tile-marks-left {
-            position: absolute;
-            top: 0;
-            left: -18px;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            align-items: center;
-        }
-        .tile-marks-right .mark, .tile-marks-left .mark {
-            width: auto;
-            min-width: 18px;
+        
+        /* --- ここから修正 --- */
+        /* 修正点1: マークの親要素をFlexboxコンテナに変更し、堅牢な中央揃えを実現 */
+        .tile-on-field .mark {
+            width: 18px;
             height: 18px;
-            padding: 0 4px;
+            padding: 0;
             border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
             font-weight: bold;
             color: white;
             background-color: rgba(0,0,0,0.6);
         }
+        
+        /* 修正点2: アイコンの位置指定を削除し、Flexboxに中央揃えを委ねる */
+         .tile-on-field .mark i {
+            font-size: 12px;
+        }
+        /* --- ここまで修正 --- */
+
         .tile-mark-bottom-left {
             position: absolute;
             bottom: -4px;
@@ -101,10 +90,9 @@
             right: -4px;
         }
         .tile-mark-bottom-left .mark, .tile-mark-bottom-right .mark {
-            width: auto;
-            min-width: 18px;
+            width: 18px;
             height: 18px;
-            padding: 0 2px;
+            padding: 0;
             border-radius: 9999px; /* 円形にする */
             display: flex;
             align-items: center;
@@ -157,7 +145,6 @@
         <h1 class="text-xl font-bold" data-lang="app_title">放り込みフォーメーション表</h1>
         <div class="flex items-center space-x-3">
             <button id="fullscreen-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" title="Fullscreen"><i class="fas fa-expand"></i></button>
-            <button id="export-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="export_image_title"><i class="fas fa-camera"></i> <span data-lang="export_image">画像出力</span></button>
             <button id="save-all-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="save_all_data_title"><i class="fas fa-save"></i> <span data-lang="save_all_data">全体保存</span></button>
             <div class="relative">
                 <button id="load-all-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="load_all_data_title"><i class="fas fa-folder-open"></i> <span data-lang="load_all_data">全体呼出</span></button>
@@ -417,33 +404,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- 画像出力モーダル -->
-    <div id="export-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
-        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-96">
-            <div class="flex justify-between items-center mb-4 relative">
-                <h3 class="text-xl font-bold" data-lang="export_image">画像出力</h3>
-                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
-            </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block mb-1" data-lang="export_area">出力範囲</label>
-                    <select id="export-area-select" class="w-full bg-gray-700 p-2 rounded">
-                        <option value="all" data-lang="entire_screen">全体</option>
-                        <option value="field" data-lang="field_only">フィールドのみ</option>
-                    </select>
-                </div>
-                 <div>
-                    <label class="block mb-1" data-lang="image_width_px">画像幅 (px)</label>
-                    <input id="export-width-input" type="number" value="1920" class="w-full bg-gray-700 p-2 rounded">
-                </div>
-                <button id="export-confirm-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 p-2 rounded flex items-center justify-center">
-                    <span data-lang="execute_export">出力実行</span>
-                    <i id="export-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-                </button>
-            </div>
-        </div>
-    </div>
 
     <!-- ヘルプモーダル -->
     <div id="help-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
@@ -457,8 +417,11 @@
                 <ul>
                     <li><strong>選手の一括登録:</strong>
                         <ul>
-                            <li>選手名が一行ずつ書かれたテキストファイル(.txt)やテキストそのものを、サイドパネルの選手リストエリアに直接ドラッグ＆ドロップすると、選手を一括登録できます。</li>
-                            <li><code>背番号 選手名 (所属)</code> の形式で解釈されます。背番号や所属は省略可能です。</li>
+                            <li>各行から「背番号」「ポジション」「所属」「名前」が自動で解釈されます。順番は自由で、省略も可能です。</li>
+                            <li><strong>所属:</strong> <code>(Aチーム)</code> のように括弧で囲んでください。</li>
+                            <li><strong>ポジション:</strong> <code>GK, DF, MF, FW</code> の大文字が認識されます。</li>
+                            <li><strong>背番号:</strong> 1〜3桁の数字が認識されます。行内に複数ある場合は最初の数字が優先されます。</li>
+                            <li><strong>例:</strong> <code>DF 5 長友 佑都 (インテル)</code></li>
                         </ul>
                     </li>
                     <li><strong>選手の個別操作:</strong>
@@ -490,9 +453,8 @@
                     <li><strong>フィールド設定:</strong> フィールドエリアをダブルクリックすると、コートの縦横切替、ピッチ反転、ボールや芝生の画像を変更できます。</li>
                 </ul>
 
-                <h4>3. 保存と出力</h4>
+                <h4>3. 保存と呼出</h4>
                 <ul>
-                    <li><strong>画像出力:</strong> トップメニューの <i class="fas fa-camera"></i> ボタンから、表示されている画面全体またはフィールドのみを画像(JPEG)として保存できます。</li>
                     <li><strong>データ保存・呼出:</strong>
                         <ul>
                             <li><strong>チーム別:</strong> サイドパネルの <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> ボタンから、そのチームの選手リストと設定を保存・呼出できます。</li>
@@ -506,8 +468,11 @@
                 <ul>
                     <li><strong>Bulk Player Registration:</strong>
                         <ul>
-                            <li>Drag and drop a text file (.txt) or plain text with one player per line directly onto the player list area in the side panel.</li>
-                            <li>Lines are interpreted in the format: <code>Number Player Name (Affiliation)</code>. Both number and affiliation are optional.</li>
+                            <li>"Number", "Position", "Affiliation", and "Name" are automatically interpreted from each line. The order is flexible, and items can be omitted.</li>
+                            <li><strong>Affiliation:</strong> Enclose in parentheses, like <code>(Team A)</code>.</li>
+                            <li><strong>Position:</strong> Recognizes <code>GK, DF, MF, FW</code> (uppercase).</li>
+                            <li><strong>Number:</strong> Recognizes 1 to 3-digit numbers. If multiple numbers exist, the first one is used.</li>
+                            <li><strong>Example:</strong> <code>DF 5 John Doe (Team A)</code></li>
                         </ul>
                     </li>
                     <li><strong>Individual Player Actions:</strong>
@@ -539,9 +504,8 @@
                     <li><strong>Field Settings:</strong> Double-click the field area to toggle orientation, flip the pitch, and change the ball or grass images.</li>
                 </ul>
 
-                <h4>3. Saving and Exporting</h4>
+                <h4>3. Saving and Loading</h4>
                 <ul>
-                    <li><strong>Export as Image:</strong> Click the <i class="fas fa-camera"></i> icon in the top menu to save the entire screen or just the field as a JPEG image.</li>
                     <li><strong>Save/Load Data:</strong>
                         <ul>
                             <li><strong>By Team:</strong> Use the <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> icons in the side panel to save or load a specific team's roster and settings.</li>
@@ -569,6 +533,8 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
 
+        let wasFullscreenBeforeFileLoad = false;
+
         // --- 定数定義 ---
         const FIELD_ASPECT_RATIO = 105 / 68;
         const BALL_SIZE = 40;
@@ -576,16 +542,15 @@
         // --- I18N (国際化) ---
         const translations = {
             ja: {
-                app_title: "放り込みフォーメーション表", export_image: "画像出力", save_all_data: "全体保存", load_all_data: "全体呼出",
-                export_image_title: "画像をエクスポート", save_all_data_title: "全体データを保存", load_all_data_title: "全体データを読み込み", help_title: "ヘルプ",
+                app_title: "放り込みフォーメーション表", save_all_data: "全体保存", load_all_data: "全体呼出",
+                save_all_data_title: "全体データを保存", load_all_data_title: "全体データを読み込み", help_title: "ヘルプ",
                 field_settings: "フィールド設定", toggle_pitch_orientation: "ピッチ縦横切替", flip_pitch: "ピッチ反転", team_settings: "チーム設定",
                 team_name: "チーム名", tile_shape: "タイルの形", circle: "円", hexagon: "6角形", octagon: "8角形",
                 tile_border_color: "タイル枠線の色", border_width: "枠線の太さ", tile_bg_color: "タイル背景色", tile_bg_image_common: "タイル背景画像（チーム共通）", drop_image_here: "ここに画像をドロップ",
                 clear_image: "画像を消去", jersey_number_color: "背番号の色", jersey_number_size: "背番号のサイズ", display_settings_field: "フィールドでの表示設定",
                 show_player_name: "選手名を表示", show_affiliation: "所属を表示", attack_direction: "攻める方向", up: "上", down: "下", left: "左", right: "右", none: "非表示",
                 tile_settings: "タイル設定", player_name: "選手名", player_number: "番号", position: "ポジション", affiliation: "所属",
-                edit_marks: "マーク編集", cards: "カード", other: "その他", clear_all_marks: "全マーク消去", export_area: "出力範囲",
-                entire_screen: "全体", field_only: "フィールドのみ", image_width_px: "画像幅 (px)", execute_export: "出力実行", help: "操作説明",
+                edit_marks: "マーク編集", cards: "カード", other: "その他", clear_all_marks: "全マーク消去", help: "操作説明",
                 add_player: "選手追加", remove_player: "選手削除", tile_size: "タイルのサイズ", change_ball_image: "ボール画像を変更", reset_ball_image: "初期化", change_grass_image: "芝生の画像を変更", reset_grass_image: "初期化",
                 drop_name_list: "選手名リストで一括登録", drop_name_list_here: "ここに選手リスト(.txt)をドロップ",
                 yellow_card_mark: "イエローカード", red_card_mark: "レッドカード", captain_mark: "キャプテン", goal_mark: "ゴール", assist_mark: "アシスト", substitution_mark: "途中出場",
@@ -601,16 +566,15 @@
                 confirm_clear_all_players_message: "本当にこのチームの全選手を削除しますか？"
             },
             en: {
-                app_title: "Formation Board", export_image: "Export Image", save_all_data: "Save All", load_all_data: "Load All",
-                export_image_title: "Export as Image", save_all_data_title: "Save All Data", load_all_data_title: "Load All Data", help_title: "Help",
+                app_title: "Formation Board", save_all_data: "Save All", load_all_data: "Load All",
+                save_all_data_title: "Save All Data", load_all_data_title: "Load All Data", help_title: "Help",
                 field_settings: "Field Settings", toggle_pitch_orientation: "Toggle Pitch Orientation", flip_pitch: "Flip Pitch", team_settings: "Team Settings",
                 team_name: "Team Name", tile_shape: "Tile Shape", circle: "Circle", hexagon: "Hexagon", octagon: "Octagon",
                 tile_border_color: "Tile Border Color", border_width: "Border Width", tile_bg_color: "Tile Background Color", tile_bg_image_common: "Tile Background Image (Team)", drop_image_here: "Drop image here",
                 clear_image: "Clear Image", jersey_number_color: "Jersey Number Color", jersey_number_size: "Jersey Number Size", display_settings_field: "Display Settings (on Field)",
                 show_player_name: "Show Player Name", show_affiliation: "Show Affiliation", attack_direction: "Attack Direction", up: "Up", down: "Down", left: "Left", right: "Right", none: "Hide",
                 tile_settings: "Tile Settings", player_name: "Player Name", player_number: "Number", position: "Position", affiliation: "Affiliation",
-                edit_marks: "Edit Marks", cards: "Cards", other: "Other", clear_all_marks: "Clear All Marks", export_area: "Export Area",
-                entire_screen: "Entire Screen", field_only: "Field Only", image_width_px: "Image Width (px)", execute_export: "Export", help: "Help",
+                edit_marks: "Edit Marks", cards: "Cards", other: "Other", clear_all_marks: "Clear All Marks", help: "Help",
                 add_player: "Add Player", remove_player: "Remove Player", tile_size: "Tile Size", change_ball_image: "Change Ball Image", reset_ball_image: "Reset", change_grass_image: "Change Grass Image", reset_grass_image: "Reset",
                 drop_name_list: "Bulk Register with Name List", drop_name_list_here: "Drop player name text file (.txt) here",
                 yellow_card_mark: "Yellow Card", red_card_mark: "Red Card", captain_mark: "Captain", goal_mark: "Goal", assist_mark: "Assist", substitution_mark: "Substitution",
@@ -685,11 +649,11 @@
             ],
             field: {
                 orientation: 'horizontal', // or 'vertical'
-                grassImage: './images/p0305_l.jpg',
+                grassImage: 'https://placehold.co/1050x680/288a42/288a42?text=+',
                 ball: { 
                     x: 50, 
                     y: 50,
-                    imageSrc: './images/soccer_ball.jpg'
+                    imageSrc: 'https://placehold.co/100x100/ffffff/000000?text=⚽'
                 }
             },
             lang: 'ja'
@@ -921,35 +885,82 @@
                     
                     const marks = tile.marks;
                     const s = team.settings;
-
-                    let captainMarkHTML = '';
-                    if (marks.captain > 0) captainMarkHTML = `<div class="mark bg-blue-500">Ⓒ</div>`;
-
-                    let otherMarksHTML = '';
-                    if(marks.yellowCard > 0) otherMarksHTML += `<div class="mark bg-yellow-400 text-black">🟨</div>`;
-                    if(marks.redCard > 0) otherMarksHTML += `<div class="mark bg-red-600">🟥</div>`;
-                    if(marks.goal > 0) otherMarksHTML += `<div class="mark bg-green-500">${'⚽'.repeat(marks.goal)}</div>`;
-                    if(marks.assist > 0) otherMarksHTML += `<div class="mark bg-blue-600 font-bold">${'A'.repeat(marks.assist)}</div>`;
-
-                    let leftMarksHTML = '';
-                    let rightMarksHTML = '';
-
                     const isHorizontal = appState.field.orientation === 'horizontal';
                     const attackDir = s.attackDirection;
                     const flipMarks = isHorizontal && attackDir === 'right';
 
-                    if (flipMarks) {
-                        rightMarksHTML = captainMarkHTML;
-                        leftMarksHTML = otherMarksHTML;
-                    } else {
-                        leftMarksHTML = captainMarkHTML;
-                        rightMarksHTML = otherMarksHTML;
-                    }
+                    const MARK_SIZE = 18;
+                    const MARK_GAP = 2;
+                    const TOTAL_MARK_SIZE = MARK_SIZE + MARK_GAP;
+
+                    // Font Awesome Icons
+                    const captainSVG = `<div class="mark" style="background-color: #3b82f6;"><i class="fas fa-copyright text-white"></i></div>`;
+                    const yellowCardSVG = `<div class="mark" style="background-color: #facc15;"></div>`;
+                    const redCardSVG = `<div class="mark" style="background-color: #dc2626;"></div>`;
+                    const goalSVG = `<div class="mark" style="background-color: #22c55e;"><i class="fas fa-futbol text-white"></i></div>`;
+                    const assistSVG = `<div class="mark" style="background-color: #2563eb;"><i class="fas fa-font text-white"></i></div>`;
                     
+                    // Separate marks into categories
+                    let captainMarkArray = [];
+                    if (marks.captain > 0) captainMarkArray.push(captainSVG);
+                    
+                    let cardMarks = [];
+                    if (marks.yellowCard > 0) cardMarks.push(yellowCardSVG);
+                    if (marks.redCard > 0) cardMarks.push(redCardSVG);
+                    
+                    let goalMarks = [];
+                    if (marks.goal > 0) for (let i = 0; i < marks.goal; i++) goalMarks.push(goalSVG);
+                    
+                    let assistMarks = [];
+                    if (marks.assist > 0) for (let i = 0; i < marks.assist; i++) assistMarks.push(assistSVG);
+
+                    let leftMarksHTML = '';
+                    let rightMarksHTML = '';
+
+                    // Vertical Marks (Captain, Cards)
+                    let leftVOffset = 0;
+                    let rightVOffset = 0;
+
+                    const verticalMarksOnLeft = flipMarks ? cardMarks : captainMarkArray;
+                    const verticalMarksOnRight = flipMarks ? captainMarkArray : cardMarks;
+                    const otherMarksContainerSide = flipMarks ? 'left' : 'right';
+
+                    verticalMarksOnLeft.forEach(mark => {
+                        leftMarksHTML += `<div style="position: absolute; top: ${leftVOffset}px; left: -${MARK_SIZE}px;">${mark}</div>`;
+                        leftVOffset += TOTAL_MARK_SIZE;
+                    });
+                    
+                    verticalMarksOnRight.forEach(mark => {
+                        rightMarksHTML += `<div style="position: absolute; top: ${rightVOffset}px; right: -${MARK_SIZE}px;">${mark}</div>`;
+                        rightVOffset += TOTAL_MARK_SIZE;
+                    });
+                    
+                    let horizontalVOffset = (otherMarksContainerSide === 'left') ? leftVOffset : rightVOffset;
+
+                    if(goalMarks.length > 0) {
+                        let hOffset = 0;
+                        goalMarks.forEach(mark => {
+                            const sideProperty = otherMarksContainerSide === 'left' ? `left: -${MARK_SIZE + hOffset}px;` : `right: -${MARK_SIZE + hOffset}px;`;
+                            const html = `<div style="position: absolute; top: ${horizontalVOffset}px; ${sideProperty}">${mark}</div>`;
+                             if(otherMarksContainerSide === 'left') leftMarksHTML += html; else rightMarksHTML += html;
+                            hOffset += TOTAL_MARK_SIZE;
+                        });
+                        horizontalVOffset += TOTAL_MARK_SIZE;
+                    }
+                    if(assistMarks.length > 0) {
+                        let hOffset = 0;
+                        assistMarks.forEach(mark => {
+                           const sideProperty = otherMarksContainerSide === 'left' ? `left: -${MARK_SIZE + hOffset}px;` : `right: -${MARK_SIZE + hOffset}px;`;
+                           const html = `<div style="position: absolute; top: ${horizontalVOffset}px; ${sideProperty}">${mark}</div>`;
+                           if(otherMarksContainerSide === 'left') leftMarksHTML += html; else rightMarksHTML += html;
+                           hOffset += TOTAL_MARK_SIZE;
+                        });
+                    }
+
                     let subMarkHTML = '';
                     if(marks.substitution > 0) {
                         const subMarkClass = flipMarks ? 'tile-mark-bottom-right' : 'tile-mark-bottom-left';
-                        subMarkHTML = `<div class="${subMarkClass}"><div class="mark bg-gray-700 flex items-center justify-center"><svg width="12" height="12" viewBox="0 0 24 24"><path fill="green" d="M2,19.333L12,4.667L22,19.333H2z"/></svg></div></div>`;
+                        subMarkHTML = `<div class="${subMarkClass}"><div class="mark" style="background-color: #6b7280;"><svg width="12" height="12" viewBox="0 0 24 24"><path fill="green" d="M2,19.333L12,4.667L22,19.333H2z"/></svg></div></div>`;
                     }
 
                     let arrowHTML = getArrowSVG(s);
@@ -957,8 +968,8 @@
                     el.innerHTML = `
                         <div class="tile-svg-container">
                             ${createTileSVG(team, tile)}
-                            ${leftMarksHTML ? `<div class="tile-marks-left">${leftMarksHTML}</div>` : ''}
-                            ${rightMarksHTML ? `<div class="tile-marks-right">${rightMarksHTML}</div>` : ''}
+                            ${leftMarksHTML}
+                            ${rightMarksHTML}
                             ${subMarkHTML}
                             ${arrowHTML}
                         </div>
@@ -973,8 +984,8 @@
         }
         
         function getArrowSVG(settings) {
-            let rotation = 0;
-            let positionStyle = '';
+            let path = '';
+            let wrapperStyle = '';
             
             const fieldOrientation = appState.field.orientation;
             let dir = settings.attackDirection;
@@ -988,26 +999,28 @@
 
             switch(dir) {
                 case 'up':
-                    rotation = 0;
-                    positionStyle = 'top: -20px; left: 50%; transform: translateX(-50%)';
+                    wrapperStyle = 'top: -20px; left: 50%; margin-left: -12px;';
+                    path = 'M12 2 L2 22 L22 22 Z';
                     break;
                 case 'down':
-                    rotation = 180;
-                    positionStyle = 'bottom: -20px; left: 50%; transform: translateX(-50%)';
+                    wrapperStyle = 'bottom: -20px; left: 50%; margin-left: -12px;';
+                    path = 'M12 22 L2 2 L22 2 Z';
                     break;
                 case 'left':
-                    rotation = -90;
-                    positionStyle = 'left: -20px; top: 50%; transform: translateY(-50%)';
+                    wrapperStyle = 'left: -20px; top: 50%; margin-top: -12px;';
+                    path = 'M2 12 L22 2 L22 22 Z';
                     break;
                 case 'right':
-                    rotation = 90;
-                    positionStyle = 'right: -20px; top: 50%; transform: translateY(-50%)';
+                    wrapperStyle = 'right: -20px; top: 50%; margin-top: -12px;';
+                    path = 'M22 12 L2 2 L2 22 Z';
                     break;
             }
             
-            return `<svg width="24" height="24" viewBox="0 0 24 24" style="position: absolute; ${positionStyle} rotate(${rotation}deg);">
-                <path d="M12 2 L2 22 L22 22 Z" fill="${settings.borderColor}" />
-            </svg>`;
+            return `<div style="position: absolute; ${wrapperStyle} width: 24px; height: 24px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24">
+                            <path d="${path}" fill="${settings.borderColor}" />
+                        </svg>
+                    </div>`;
         }
         
         function getFieldLinesSVG(w, h) {
@@ -1090,10 +1103,13 @@
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
                 else document.exitFullscreen();
             });
-            document.getElementById('export-btn').addEventListener('click', () => showModal('export-modal'));
             document.getElementById('save-all-btn').addEventListener('click', () => saveState('all'));
-            document.getElementById('load-all-btn').addEventListener('click', () => document.getElementById('load-all-input').click());
+            
+            document.getElementById('load-all-btn').addEventListener('click', () => {
+                document.getElementById('load-all-input').click();
+            });
             document.getElementById('load-all-input').addEventListener('change', (e) => loadState(e, 'all'));
+            
             document.getElementById('help-btn').addEventListener('click', () => showModal('help-modal'));
             document.getElementById('lang-select').addEventListener('change', (e) => {
                 currentLang = e.target.value;
@@ -1625,24 +1641,43 @@
             const lines = text.split(/\r?\n/).filter(line => line.trim());
             if (lines.length === 0) return;
             let maxOrder = team.tiles.length > 0 ? Math.max(...team.tiles.map(t => t.order)) : -1;
+            
             lines.forEach(line => {
-                let processedLine = line.trim(), affiliation = '', number = '';
+                let processedLine = line.trim();
+                let affiliation = '', 
+                    position = '',
+                    number = '';
+
+                // 1. 所属を抽出
                 const affiliationMatch = processedLine.match(/\(([^)]+)\)|（([^）]+)）/);
                 if (affiliationMatch) {
                     affiliation = affiliationMatch[1] || affiliationMatch[2] || '';
-                    processedLine = processedLine.replace(/\(([^)]+)\)|（([^）]+)）/, '').trim();
+                    processedLine = processedLine.replace(affiliationMatch[0], '').trim();
                 }
-                const numberMatch = processedLine.match(/^\d+\s*/);
+                
+                // 2. ポジションを抽出
+                const positionMatch = processedLine.match(/\b(GK|DF|MF|FW)\b/);
+                if (positionMatch) {
+                    position = positionMatch[1];
+                    processedLine = processedLine.replace(positionMatch[0], '').trim();
+                }
+                
+                // 3. 背番号を抽出 (1-3桁)
+                const numberMatch = processedLine.match(/\b(\d{1,3})\b/);
                 if (numberMatch) {
-                    number = numberMatch[0].trim();
-                    processedLine = processedLine.substring(numberMatch[0].length).trim();
+                    number = numberMatch[1];
+                    processedLine = processedLine.replace(new RegExp('\\b' + numberMatch[0] + '\\b'), '').trim();
                 }
-                const name = processedLine || 'Player';
+                
+                // 4. 残りを名前に (連続する空白は一つにまとめる)
+                const name = processedLine.replace(/\s{2,}/g, ' ').trim() || 'Player';
+                
                 maxOrder++;
                 const newId = `${teamId}-${Date.now()}-${maxOrder}`;
                 const newTile = createDefaultTile(newId, number, maxOrder);
                 newTile.name = name;
                 newTile.affiliation = affiliation;
+                newTile.position = position;
                 team.tiles.push(newTile);
             });
             renderAll();
@@ -1783,8 +1818,6 @@
                  renderAll();
             });
             
-            document.getElementById('export-confirm-btn').addEventListener('click', exportImage);
-
             const bgImageDropArea = document.getElementById('bg-image-drop-area');
             bgImageDropArea.addEventListener('dragover', (e) => { e.preventDefault(); bgImageDropArea.classList.add('drag-over'); });
             bgImageDropArea.addEventListener('dragleave', () => bgImageDropArea.classList.remove('drag-over'));
@@ -2015,44 +2048,6 @@
                 reader.readAsText(file);
             }
         }
-        
-        // --- 画像出力 ---
-        async function exportImage() {
-            const area = document.getElementById('export-area-select').value;
-            const width = parseInt(document.getElementById('export-width-input').value) || 1920;
-            const spinner = document.getElementById('export-spinner');
-            
-            spinner.classList.remove('hidden');
-            const targetElement = area === 'field' ? document.getElementById('field-area') : document.querySelector('.flex-1.overflow-hidden');
-            
-            try {
-                const canvas = await html2canvas(targetElement, {
-                     scale: 2,
-                     backgroundColor: area === 'field' ? null : '#1f2937',
-                     useCORS: true,
-                });
-                
-                const aspect = canvas.width / canvas.height;
-                const resizedCanvas = document.createElement('canvas');
-                resizedCanvas.width = width;
-                resizedCanvas.height = width / aspect;
-                const ctx = resizedCanvas.getContext('2d');
-                ctx.drawImage(canvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
-
-                const dataUrl = resizedCanvas.toDataURL('image/jpeg', 0.9);
-                const a = document.createElement('a');
-                const date = new Date();
-                a.href = dataUrl;
-                a.download = `formation_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.jpeg`;
-                a.click();
-            } catch(e) {
-                console.error('Image export failed:', e);
-                alert('Image export failed. See console for details.');
-            } finally {
-                spinner.classList.add('hidden');
-                hideModals();
-            }
-        }
 
         // --- 初期化処理 ---
         initializeState();
@@ -2064,4 +2059,3 @@
     </script>
 </body>
 </html>
-
