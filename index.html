@@ -58,8 +58,6 @@
             position: relative;
         }
         
-        /* --- ここから修正 --- */
-        /* 修正点1: マークの親要素をFlexboxコンテナに変更し、堅牢な中央揃えを実現 */
         .tile-on-field .mark {
             width: 18px;
             height: 18px;
@@ -73,11 +71,9 @@
             background-color: rgba(0,0,0,0.6);
         }
         
-        /* 修正点2: アイコンの位置指定を削除し、Flexboxに中央揃えを委ねる */
          .tile-on-field .mark i {
             font-size: 12px;
         }
-        /* --- ここまで修正 --- */
 
         .tile-mark-bottom-left {
             position: absolute;
@@ -649,11 +645,11 @@
             ],
             field: {
                 orientation: 'horizontal', // or 'vertical'
-                grassImage: 'https://placehold.co/1050x680/288a42/288a42?text=+',
+                grassImage: 'images/p0305_l.jpg',
                 ball: { 
                     x: 50, 
                     y: 50,
-                    imageSrc: 'https://placehold.co/100x100/ffffff/000000?text=⚽'
+                    imageSrc: 'images/soccer_ball.jpg'
                 }
             },
             lang: 'ja'
@@ -1817,7 +1813,7 @@
                  }
                  renderAll();
             });
-            
+
             const bgImageDropArea = document.getElementById('bg-image-drop-area');
             bgImageDropArea.addEventListener('dragover', (e) => { e.preventDefault(); bgImageDropArea.classList.add('drag-over'); });
             bgImageDropArea.addEventListener('dragleave', () => bgImageDropArea.classList.remove('drag-over'));
@@ -2059,3 +2055,4 @@
     </script>
 </body>
 </html>
+
