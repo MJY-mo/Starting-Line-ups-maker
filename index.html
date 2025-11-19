@@ -6,6 +6,7 @@
     <title>放り込みフォーメーション表</title>
     <link rel="icon" href="favicon15.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -42,6 +43,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            /* 画像出力時のズレ防止のため、transformはJS制御以外では極力使わない */
         }
         .tile-on-panel {
             display: flex;
@@ -141,6 +143,7 @@
         <h1 class="text-xl font-bold" data-lang="app_title">放り込みフォーメーション表</h1>
         <div class="flex items-center space-x-3">
             <button id="fullscreen-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" title="Fullscreen"><i class="fas fa-expand"></i></button>
+            <button id="export-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="export_image_title"><i class="fas fa-camera"></i> <span data-lang="export_image">画像出力</span></button>
             <button id="save-all-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="save_all_data_title"><i class="fas fa-save"></i> <span data-lang="save_all_data">全体保存</span></button>
             <div class="relative">
                 <button id="load-all-btn" class="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg" data-lang-title="load_all_data_title"><i class="fas fa-folder-open"></i> <span data-lang="load_all_data">全体呼出</span></button>
@@ -401,6 +404,33 @@
         </div>
     </div>
 
+    <!-- 画像出力モーダル -->
+    <div id="export-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-96">
+            <div class="flex justify-between items-center mb-4 relative">
+                <h3 class="text-xl font-bold" data-lang="export_image">画像出力</h3>
+                <button class="close-modal-btn text-2xl font-bold text-gray-400 hover:text-white absolute -top-2 -right-2 w-8 h-8 flex items-center justify-center bg-gray-700 rounded-full">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block mb-1" data-lang="export_area">出力範囲</label>
+                    <select id="export-area-select" class="w-full bg-gray-700 p-2 rounded">
+                        <option value="all" data-lang="entire_screen">全体</option>
+                        <option value="field" data-lang="field_only">フィールドのみ</option>
+                    </select>
+                </div>
+                 <div>
+                    <label class="block mb-1" data-lang="image_width_px">画像幅 (px)</label>
+                    <input id="export-width-input" type="number" value="1920" class="w-full bg-gray-700 p-2 rounded">
+                </div>
+                <button id="export-confirm-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 p-2 rounded flex items-center justify-center">
+                    <span data-lang="execute_export">出力実行</span>
+                    <i id="export-spinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- ヘルプモーダル -->
     <div id="help-modal" class="fixed inset-0 hidden items-center justify-center modal-backdrop z-50">
         <div class="bg-gray-800 rounded-lg shadow-xl p-6 w-1/2 max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -454,6 +484,11 @@
                             <li><strong>全体:</strong> トップメニューの <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> ボタンから、両チームとフィールドの状態をすべて含んだ全体のデータを保存・呼出できます。</li>
                         </ul>
                     </li>
+                    <li><strong>画像出力:</strong>
+                        <ul>
+                             <li><i class="fas fa-camera"></i> ボタンから、現在の配置を画像としてダウンロードできます。</li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
              <div class="prose prose-invert max-w-none space-y-4 help-content" data-lang-content="en" style="display: none;">
@@ -502,6 +537,11 @@
                             <li><strong>All Data:</strong> Use the <i class="fas fa-save"></i> / <i class="fas fa-folder-open"></i> icons in the top menu to save or load the entire state, including both teams and the field setup.</li>
                         </ul>
                     </li>
+                     <li><strong>Export Image:</strong>
+                        <ul>
+                             <li>Click the <i class="fas fa-camera"></i> icon to download the current formation as an image.</li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -533,6 +573,7 @@
         const translations = {
             ja: {
                 app_title: "放り込みフォーメーション表", save_all_data: "全体保存", load_all_data: "全体呼出",
+                export_image: "画像出力", export_image_title: "画像をエクスポート",
                 save_all_data_title: "全体データを保存", load_all_data_title: "全体データを読み込み", help_title: "ヘルプ",
                 field_settings: "フィールド設定", toggle_pitch_orientation: "ピッチ縦横切替", flip_pitch: "ピッチ反転", team_settings: "チーム設定",
                 team_name: "チーム名", tile_shape: "タイルの形", circle: "円", hexagon: "6角形", octagon: "8角形",
@@ -541,6 +582,7 @@
                 show_player_name: "選手名を表示", show_affiliation: "所属を表示", attack_direction: "攻める方向", up: "上", down: "下", left: "左", right: "右", none: "非表示",
                 tile_settings: "タイル設定", player_name: "選手名", player_number: "番号", position: "ポジション", affiliation: "所属",
                 edit_marks: "マーク編集", cards: "カード", other: "その他", clear_all_marks: "全マーク消去", help: "操作説明",
+                export_area: "出力範囲", entire_screen: "全体", field_only: "フィールドのみ", image_width_px: "画像幅 (px)", execute_export: "出力実行",
                 add_player: "選手追加", remove_player: "選手削除", tile_size: "タイルのサイズ", change_ball_image: "ボール画像を変更", reset_ball_image: "初期化", change_grass_image: "芝生の画像を変更", reset_grass_image: "初期化",
                 drop_name_list: "選手名リストで一括登録", drop_name_list_here: "ここに選手リスト(.txt)をドロップ",
                 yellow_card_mark: "イエローカード", red_card_mark: "レッドカード", captain_mark: "キャプテン", goal_mark: "ゴール", assist_mark: "アシスト", substitution_mark: "途中出場",
@@ -557,6 +599,7 @@
             },
             en: {
                 app_title: "Formation Board", save_all_data: "Save All", load_all_data: "Load All",
+                export_image: "Export Image", export_image_title: "Export as Image",
                 save_all_data_title: "Save All Data", load_all_data_title: "Load All Data", help_title: "Help",
                 field_settings: "Field Settings", toggle_pitch_orientation: "Toggle Pitch Orientation", flip_pitch: "Flip Pitch", team_settings: "Team Settings",
                 team_name: "Team Name", tile_shape: "Tile Shape", circle: "Circle", hexagon: "Hexagon", octagon: "Octagon",
@@ -565,6 +608,7 @@
                 show_player_name: "Show Player Name", show_affiliation: "Show Affiliation", attack_direction: "Attack Direction", up: "Up", down: "Down", left: "Left", right: "Right", none: "Hide",
                 tile_settings: "Tile Settings", player_name: "Player Name", player_number: "Number", position: "Position", affiliation: "Affiliation",
                 edit_marks: "Edit Marks", cards: "Cards", other: "Other", clear_all_marks: "Clear All Marks", help: "Help",
+                export_area: "Export Area", entire_screen: "Entire Screen", field_only: "Field Only", image_width_px: "Image Width (px)", execute_export: "Export",
                 add_player: "Add Player", remove_player: "Remove Player", tile_size: "Tile Size", change_ball_image: "Change Ball Image", reset_ball_image: "Reset", change_grass_image: "Change Grass Image", reset_grass_image: "Reset",
                 drop_name_list: "Bulk Register with Name List", drop_name_list_here: "Drop player name text file (.txt) here",
                 yellow_card_mark: "Yellow Card", red_card_mark: "Red Card", captain_mark: "Captain", goal_mark: "Goal", assist_mark: "Assist", substitution_mark: "Substitution",
@@ -1093,6 +1137,7 @@
                 if (!document.fullscreenElement) document.documentElement.requestFullscreen();
                 else document.exitFullscreen();
             });
+            document.getElementById('export-btn').addEventListener('click', () => showModal('export-modal'));
             document.getElementById('save-all-btn').addEventListener('click', () => saveState('all'));
             
             document.getElementById('load-all-btn').addEventListener('click', () => {
@@ -1816,6 +1861,8 @@
                  }
                  renderAll();
             });
+            
+            document.getElementById('export-confirm-btn').addEventListener('click', exportImage);
 
             const bgImageDropArea = document.getElementById('bg-image-drop-area');
             bgImageDropArea.addEventListener('dragover', (e) => { e.preventDefault(); bgImageDropArea.classList.add('drag-over'); });
@@ -2047,6 +2094,75 @@
                 reader.readAsText(file);
             }
         }
+        
+        // --- 画像出力処理 ---
+        async function exportImage() {
+            const area = document.getElementById('export-area-select').value;
+            const width = parseInt(document.getElementById('export-width-input').value) || 1920;
+            const spinner = document.getElementById('export-spinner');
+            
+            spinner.classList.remove('hidden');
+            const targetElement = area === 'field' ? document.getElementById('field-area') : document.querySelector('.flex-1.overflow-hidden');
+            
+            try {
+                // oncloneコールバックで、キャプチャ直前のクローンDOMを操作する
+                const canvas = await html2canvas(targetElement, {
+                     scale: 2, // 解像度向上
+                     backgroundColor: area === 'field' ? null : '#1f2937',
+                     useCORS: true,
+                     onclone: (clonedDoc) => {
+                         // 撮影前に、クローン上の要素配置を安定化（ピクセル値に固定）させる
+                         // これが「ズレ」を防ぐための重要な処理です
+                         stabilizeElementsForCapture(clonedDoc, area);
+                     }
+                });
+                
+                const aspect = canvas.width / canvas.height;
+                const resizedCanvas = document.createElement('canvas');
+                resizedCanvas.width = width;
+                resizedCanvas.height = width / aspect;
+                const ctx = resizedCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
+
+                const dataUrl = resizedCanvas.toDataURL('image/jpeg', 0.9);
+                const a = document.createElement('a');
+                const date = new Date();
+                a.href = dataUrl;
+                a.download = `formation_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.jpeg`;
+                a.click();
+            } catch(e) {
+                console.error('Image export failed:', e);
+                alert('Image export failed. See console for details.');
+            } finally {
+                spinner.classList.add('hidden');
+                hideModals();
+            }
+        }
+        
+        // 画像出力時のズレ防止：相対座標(%)を絶対座標(px)に変換して固定する
+        function stabilizeElementsForCapture(clonedDoc, area) {
+            const clonedField = clonedDoc.getElementById('field-area');
+            if (!clonedField) return;
+
+            const rect = clonedField.getBoundingClientRect();
+            const width = rect.width;
+            const height = rect.height;
+            
+            // タイル、ボールの位置を%からpxに確定させる
+            const elements = clonedField.querySelectorAll('.tile-on-field, .soccer-ball');
+            elements.forEach(el => {
+                // 現在の計算済みスタイルを取得
+                const style = window.getComputedStyle(el);
+                const left = parseFloat(style.left);
+                const top = parseFloat(style.top);
+                
+                // スタイルをpx値で上書きし、calc()や%によるブラウザごとのズレを排除
+                el.style.left = `${left}px`;
+                el.style.top = `${top}px`;
+                el.style.transform = 'none'; // transformによる位置調整もリセット（もしあれば）
+                el.style.margin = '0'; // マージンによる干渉も防ぐ
+            });
+        }
 
         // --- 初期化処理 ---
         initializeState();
@@ -2058,7 +2174,3 @@
     </script>
 </body>
 </html>
-
-
-
-
