@@ -43,7 +43,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            /* 画像出力時のズレ防止のため、transformはJS制御以外では極力使わない */
         }
         .tile-on-panel {
             display: flex;
@@ -793,7 +792,7 @@
                             <path d="${path}" />
                         </clipPath>
                         ${s.bgImage ? `
-                        <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="${size}" height="${size}">
+                        <pattern id="${patternId}" patternUnits="objectBoundingBox" width="1" height="1">
                             <image href="${s.bgImage}" x="0" y="0" width="${size}" height="${size}" preserveAspectRatio="xMidYMid slice" />
                         </pattern>
                         ` : ''}
@@ -1452,17 +1451,23 @@
         function dropOnPanel(panel, dropInfo) {
             const { teamId, tileId } = dropInfo;
             const targetTeamId = panel.dataset.teamId;
+            
+            // 異なるチームへのドロップを防止
+            if (targetTeamId !== teamId) {
+                return;
+            }
+
             const tile = findTile(teamId, tileId);
             if (!tile) return;
 
-            if (targetTeamId !== teamId) {
-                const originalTeam = appState.teams[teamId];
-                const tileIndex = originalTeam.tiles.findIndex(t => t.id === tileId);
-                if (tileIndex > -1) originalTeam.tiles.splice(tileIndex, 1);
+            // if (targetTeamId !== teamId) {
+            //     const originalTeam = appState.teams[teamId];
+            //     const tileIndex = originalTeam.tiles.findIndex(t => t.id === tileId);
+            //     if (tileIndex > -1) originalTeam.tiles.splice(tileIndex, 1);
                 
-                tile.id = `${targetTeamId}-${Date.now()}`;
-                appState.teams[targetTeamId].tiles.push(tile);
-            }
+            //     tile.id = `${targetTeamId}-${Date.now()}`;
+            //     appState.teams[targetTeamId].tiles.push(tile);
+            // }
             
             tile.location = 'panel';
             tile.x = null;
@@ -2102,18 +2107,100 @@
             const spinner = document.getElementById('export-spinner');
             
             spinner.classList.remove('hidden');
-            const targetElement = area === 'field' ? document.getElementById('field-area') : document.querySelector('.flex-1.overflow-hidden');
             
+            // ターゲット要素の特定
+            let targetElement;
+            if (area === 'field') {
+                targetElement = document.getElementById('field-area');
+            } else {
+                targetElement = document.querySelector('.flex-1.overflow-hidden');
+            }
+
+            // ★重要: 撮影前に「元DOM」の座標情報を収集する
+            // フィールド内の絶対配置要素（タイル、ボール、矢印）の位置を特定
+            const fieldArea = document.getElementById('field-area');
+            const fieldRect = fieldArea.getBoundingClientRect();
+            const elementsToFix = [];
+
+            // フィールド直下の絶対配置要素をすべて取得（タイル、ボール、矢印含む）
+            Array.from(fieldArea.children).forEach(child => {
+                const style = window.getComputedStyle(child);
+                if (style.position === 'absolute') {
+                    const rect = child.getBoundingClientRect();
+                    // field-area からの相対座標を計算
+                    const relLeft = rect.left - fieldRect.left;
+                    const relTop = rect.top - fieldRect.top;
+                    
+                    elementsToFix.push({
+                        index: Array.from(fieldArea.children).indexOf(child),
+                        left: relLeft,
+                        top: relTop,
+                        width: rect.width,
+                        height: rect.height
+                    });
+                }
+            });
+
             try {
                 // oncloneコールバックで、キャプチャ直前のクローンDOMを操作する
                 const canvas = await html2canvas(targetElement, {
                      scale: 2, // 解像度向上
                      backgroundColor: area === 'field' ? null : '#1f2937',
                      useCORS: true,
+                     logging: false,
                      onclone: (clonedDoc) => {
-                         // 撮影前に、クローン上の要素配置を安定化（ピクセル値に固定）させる
-                         // これが「ズレ」を防ぐための重要な処理です
-                         stabilizeElementsForCapture(clonedDoc, area);
+                         // クローンされたDOMのフィールドを取得
+                         const clonedField = clonedDoc.getElementById('field-area');
+                         if (!clonedField) return;
+
+                         // 収集した座標情報をクローン要素に適用
+                         const clonedChildren = Array.from(clonedField.children);
+                         elementsToFix.forEach(item => {
+                             const el = clonedChildren[item.index];
+                             if (el) {
+                                 // スタイルを強制上書き
+                                 el.style.position = 'absolute';
+                                 el.style.left = `${item.left}px`;
+                                 el.style.top = `${item.top}px`;
+                                 el.style.transform = 'none'; 
+                                 el.style.margin = '0';
+                                 el.style.bottom = 'auto';
+                                 el.style.right = 'auto';
+                             }
+                         });
+
+                         // 2. NEW: Fix internal vertical alignment for html2canvas
+                         // Fix Marks (Icons shifting down)
+                         const marks = clonedField.querySelectorAll('.mark');
+                         marks.forEach(mark => {
+                             // Force flex centering explicitly
+                             mark.style.display = 'flex';
+                             mark.style.alignItems = 'center';
+                             mark.style.justifyContent = 'center';
+                             // Reset margins/padding
+                             mark.style.margin = '0';
+                             mark.style.padding = '0';
+                             // Explicit line-height to prevent text baseline shift
+                             mark.style.lineHeight = '1'; 
+                             
+                             // If using FontAwesome, sometimes explicit height on the 'i' helps or unsetting it
+                             const icon = mark.querySelector('i');
+                             if(icon) {
+                                 icon.style.verticalAlign = 'middle';
+                                 icon.style.display = 'inline-block'; // helps with transform stability
+                             }
+                         });
+
+                         // Fix Names (Text shifting down)
+                         const tileTexts = clonedField.querySelectorAll('.tile-on-field div.mt-1');
+                         tileTexts.forEach(container => {
+                             container.style.marginTop = '2px'; // Reduce margin if it looks too low
+                             // Reset line heights of children
+                             Array.from(container.children).forEach(text => {
+                                 text.style.lineHeight = '1.2';
+                                 text.style.display = 'block';
+                             });
+                         });
                      }
                 });
                 
@@ -2137,31 +2224,6 @@
                 spinner.classList.add('hidden');
                 hideModals();
             }
-        }
-        
-        // 画像出力時のズレ防止：相対座標(%)を絶対座標(px)に変換して固定する
-        function stabilizeElementsForCapture(clonedDoc, area) {
-            const clonedField = clonedDoc.getElementById('field-area');
-            if (!clonedField) return;
-
-            const rect = clonedField.getBoundingClientRect();
-            const width = rect.width;
-            const height = rect.height;
-            
-            // タイル、ボールの位置を%からpxに確定させる
-            const elements = clonedField.querySelectorAll('.tile-on-field, .soccer-ball');
-            elements.forEach(el => {
-                // 現在の計算済みスタイルを取得
-                const style = window.getComputedStyle(el);
-                const left = parseFloat(style.left);
-                const top = parseFloat(style.top);
-                
-                // スタイルをpx値で上書きし、calc()や%によるブラウザごとのズレを排除
-                el.style.left = `${left}px`;
-                el.style.top = `${top}px`;
-                el.style.transform = 'none'; // transformによる位置調整もリセット（もしあれば）
-                el.style.margin = '0'; // マージンによる干渉も防ぐ
-            });
         }
 
         // --- 初期化処理 ---
