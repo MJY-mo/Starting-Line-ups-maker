@@ -6,6 +6,7 @@
     <title>放り込みフォーメーション表</title>
     <link rel="icon" href="favicon15.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 実績のあるhtml2canvasを使用 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -720,7 +721,245 @@
             document.getElementById('lang-select').value = currentLang;
         }
 
-        // --- ドラッグ&ドロップ管理 (リファクタリング版) ---
+        // --- データ永続化関数 (定義順序を上に移動) ---
+        function saveState(type = 'all', teamId = null) {
+            let dataToSave;
+            let filename = `formation_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
+
+            if (type === 'team' && teamId !== null) {
+                const teamData = appState.teams[teamId];
+                // フィールド上のタイル情報を除外して保存
+                const teamToSave = JSON.parse(JSON.stringify(teamData));
+                teamToSave.tiles.forEach(t => {
+                    t.location = 'panel';
+                    t.x = null;
+                    t.y = null;
+                });
+                dataToSave = teamToSave;
+                filename = `${teamData.name || 'team'}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`;
+            } else {
+                dataToSave = appState;
+                filename += '_all.json';
+            }
+
+            const dataStr = JSON.stringify(dataToSave, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function loadState(event, type = 'all', teamId = null) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const newState = JSON.parse(e.target.result);
+                        if (type === 'all' && newState.teams && newState.field) {
+                            appState = newState;
+                             appState.teams.forEach(team => {
+                                if (!team.sortState) team.sortState = 'custom';
+                                if (team.settings.nameColor === undefined) {
+                                    Object.assign(team.settings, defaultAppState.teams[0].settings);
+                                }
+                            });
+                        } else if (type === 'team' && teamId !== null && newState.name && newState.tiles) {
+                            // Clear existing players on field for the loading team
+                            appState.teams[teamId].tiles.forEach(tile => {
+                                tile.location = 'panel';
+                            });
+                            
+                            // Load new team data
+                            appState.teams[teamId] = newState;
+                            if (!appState.teams[teamId].sortState) {
+                                appState.teams[teamId].sortState = 'custom';
+                            }
+
+                        } else {
+                             alert('Invalid file format.');
+                             return;
+                        }
+
+                        currentLang = appState.lang || 'ja';
+                        document.getElementById('lang-select').value = currentLang;
+                        renderAll();
+
+                    } catch (err) {
+                        alert('Error reading file: ' + err.message);
+                    } finally {
+                        event.target.value = null;
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // ズレ防止のための強力な補正関数
+        function stabilizeElementsForCapture(clonedDoc, originalDoc, area) {
+            const clonedField = clonedDoc.getElementById('field-area');
+            const originalField = originalDoc.getElementById('field-area');
+            
+            // --- フィールド上の要素の補正 (元々の実装) ---
+            if (clonedField && originalField) {
+                const baseRect = originalField.getBoundingClientRect();
+                const targets = [
+                    { sel: '.tile-on-field', type: 'tile' },
+                    { sel: '.soccer-ball', type: 'ball' }
+                ];
+
+                targets.forEach(target => {
+                    const originalElements = Array.from(originalField.querySelectorAll(target.sel));
+                    const clonedElements = Array.from(clonedField.querySelectorAll(target.sel));
+
+                    originalElements.forEach((origEl, index) => {
+                        const cloneEl = clonedElements[index];
+                        if (!cloneEl) return;
+                        const rect = origEl.getBoundingClientRect();
+                        const left = rect.left - baseRect.left;
+                        const top = rect.top - baseRect.top;
+                        cloneEl.style.position = 'absolute';
+                        cloneEl.style.left = `${left}px`;
+                        cloneEl.style.top = `${top}px`;
+                        cloneEl.style.width = `${rect.width}px`;
+                        cloneEl.style.height = `${rect.height}px`;
+                        cloneEl.style.transform = 'none';
+                        cloneEl.style.margin = '0';
+                        cloneEl.style.right = 'auto';
+                        cloneEl.style.bottom = 'auto';
+                    });
+                });
+            }
+            
+            // --- 共通: フォントレンダリングのズレ補正 (全体適用) ---
+            
+            // 1. アイコン (マーク) の位置調整
+            const marks = clonedDoc.querySelectorAll('.mark');
+            marks.forEach(mark => {
+                mark.style.display = 'flex';
+                mark.style.alignItems = 'center';
+                mark.style.justifyContent = 'center';
+                
+                const icon = mark.querySelector('i, svg');
+                if (icon) {
+                    icon.style.position = 'relative';
+                    icon.style.top = '-6px'; // 6px上に
+                }
+            });
+
+            // 2. パネル内のテキスト (名前、ポジション、所属)
+            const panelTiles = clonedDoc.querySelectorAll('.tile-on-panel');
+            panelTiles.forEach(tile => {
+                const textContainer = tile.querySelector('div.ml-2');
+                if (textContainer) {
+                    textContainer.style.position = 'relative';
+                    textContainer.style.top = '-6px'; 
+                    
+                    // 高さ不足による切れ防止：padding-bottomを追加
+                    textContainer.style.paddingBottom = '15px';
+                    // コンテナ自体の高さを広げる必要があれば height: auto !important も検討
+                }
+            });
+
+            // 3. チーム名 (ヘッダー)
+            const teamHeaders = clonedDoc.querySelectorAll('.team-panel h2');
+            teamHeaders.forEach(header => {
+                header.style.position = 'relative';
+                header.style.top = '-6px';
+                
+                // 高さ不足による切れ防止
+                header.style.paddingBottom = '15px';
+                header.style.marginBottom = '0'; // mb-2などの影響を相殺
+            });
+
+            // 4. フィールド上の名前・所属
+            const fieldTexts = clonedDoc.querySelectorAll('.tile-on-field > div.mt-1');
+            fieldTexts.forEach(div => {
+                 div.style.marginTop = '0'; 
+                 div.style.position = 'relative';
+                 div.style.top = '-6px'; // 6px上に
+            });
+        }
+
+        // --- 画像出力処理 (html2canvas使用 + 座標補正) ---
+        async function exportImage() {
+            const area = document.getElementById('export-area-select').value;
+            const widthInput = parseInt(document.getElementById('export-width-input').value) || 1920;
+            const spinner = document.getElementById('export-spinner');
+            
+            spinner.classList.remove('hidden');
+            
+            // ターゲット要素の特定
+            let targetElement;
+            if (area === 'field') {
+                targetElement = document.getElementById('field-area');
+            } else {
+                // 全体の場合、背景色が透明になるのを防ぐため、メインコンテナを指定
+                targetElement = document.querySelector('.flex-1.overflow-hidden'); 
+            }
+
+            if (!targetElement) {
+                alert("Target element not found");
+                spinner.classList.add('hidden');
+                return;
+            }
+
+            try {
+                // 以前のhtml2canvas呼び出し設定を復元しつつ、oncloneで補正を入れる
+                const canvas = await html2canvas(targetElement, {
+                    scale: 2, // 解像度向上
+                    backgroundColor: area === 'field' ? null : '#1f2937',
+                    useCORS: true, // FontAwesomeなどのために必須
+                    logging: false,
+                    scrollX: 0,
+                    scrollY: 0,
+                    onclone: (clonedDoc) => {
+                        // クローンされたDOMに対して座標補正を適用
+                        // 全体のクリッピングを解除して、はみ出しを表示させる
+                        const clonedTarget = area === 'field' 
+                            ? clonedDoc.getElementById('field-area') 
+                            : clonedDoc.querySelector('.flex-1.overflow-hidden');
+                        
+                        if (clonedTarget) {
+                            clonedTarget.style.overflow = 'visible';
+                            // 必要に応じて親要素もoverflow: visibleにする
+                            if (area !== 'field') {
+                                const teamPanels = clonedDoc.querySelectorAll('.team-panel');
+                                teamPanels.forEach(panel => panel.style.overflow = 'visible');
+                            }
+                        }
+
+                        stabilizeElementsForCapture(clonedDoc, document, area);
+                    }
+                });
+
+                const aspect = canvas.width / canvas.height;
+                const resizedCanvas = document.createElement('canvas');
+                resizedCanvas.width = widthInput;
+                resizedCanvas.height = widthInput / aspect;
+                const ctx = resizedCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
+
+                const dataUrl = resizedCanvas.toDataURL('image/jpeg', 0.9);
+                const a = document.createElement('a');
+                const date = new Date();
+                a.href = dataUrl;
+                a.download = `formation_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.jpeg`;
+                a.click();
+
+            } catch (error) {
+                console.error('oops, something went wrong!', error);
+                alert('Image export failed. Please try again.');
+            } finally {
+                spinner.classList.add('hidden');
+                hideModals();
+            }
+        }
+
+        // --- ドラッグ&ドロップ管理 ---
         const dragged = {
             type: null, // 'tile-on-field', 'panel-tile', 'ball'
             element: null, // ドラッグ中のゴースト要素
@@ -782,7 +1021,7 @@
                     break;
             }
             
-            // レンダリング毎にユニークなIDを生成して、ID重複による描画バグ（他タイルのパターン参照など）を防ぐ
+            // レンダリング毎にユニークなIDを生成して、ID重複による描画バグを防ぐ
             const uniqueSuffix = Math.random().toString(36).substr(2, 9);
             const clipId = `clip-${tile.id}-${uniqueSuffix}`;
             const patternId = `pattern-${tile.id}-${uniqueSuffix}`;
@@ -2025,209 +2264,6 @@
 
         function findTile(teamId, tileId) {
             return appState.teams[teamId]?.tiles.find(t => t.id === tileId);
-        }
-
-        // --- データ永続化 ---
-        function saveState(type = 'all', teamId = null) {
-            let dataToSave;
-            let filename = `formation_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`;
-
-            if (type === 'team' && teamId !== null) {
-                const teamData = appState.teams[teamId];
-                // フィールド上のタイル情報を除外して保存
-                const teamToSave = JSON.parse(JSON.stringify(teamData));
-                teamToSave.tiles.forEach(t => {
-                    t.location = 'panel';
-                    t.x = null;
-                    t.y = null;
-                });
-                dataToSave = teamToSave;
-                filename = `${teamData.name || 'team'}_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`;
-            } else {
-                dataToSave = appState;
-                filename += '_all.json';
-            }
-
-            const dataStr = JSON.stringify(dataToSave, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-        
-        function loadState(event, type = 'all', teamId = null) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    try {
-                        const newState = JSON.parse(e.target.result);
-                        if (type === 'all' && newState.teams && newState.field) {
-                            appState = newState;
-                             appState.teams.forEach(team => {
-                                if (!team.sortState) team.sortState = 'custom';
-                                if (team.settings.nameColor === undefined) {
-                                    Object.assign(team.settings, defaultAppState.teams[0].settings);
-                                }
-                            });
-                        } else if (type === 'team' && teamId !== null && newState.name && newState.tiles) {
-                            // Clear existing players on field for the loading team
-                            appState.teams[teamId].tiles.forEach(tile => {
-                                tile.location = 'panel';
-                            });
-                            
-                            // Load new team data
-                            appState.teams[teamId] = newState;
-                            if (!appState.teams[teamId].sortState) {
-                                appState.teams[teamId].sortState = 'custom';
-                            }
-
-                        } else {
-                             alert('Invalid file format.');
-                             return;
-                        }
-
-                        currentLang = appState.lang || 'ja';
-                        document.getElementById('lang-select').value = currentLang;
-                        renderAll();
-
-                    } catch (err) {
-                        alert('Error reading file: ' + err.message);
-                    } finally {
-                        event.target.value = null;
-                    }
-                };
-                reader.readAsText(file);
-            }
-        }
-        
-        // --- 画像出力処理 ---
-        async function exportImage() {
-            const area = document.getElementById('export-area-select').value;
-            const width = parseInt(document.getElementById('export-width-input').value) || 1920;
-            const spinner = document.getElementById('export-spinner');
-            
-            spinner.classList.remove('hidden');
-            
-            // ターゲット要素の特定
-            let targetElement;
-            if (area === 'field') {
-                targetElement = document.getElementById('field-area');
-            } else {
-                targetElement = document.querySelector('.flex-1.overflow-hidden');
-            }
-
-            // ★重要: 撮影前に「元DOM」の座標情報を収集する
-            // フィールド内の絶対配置要素（タイル、ボール、矢印）の位置を特定
-            const fieldArea = document.getElementById('field-area');
-            const fieldRect = fieldArea.getBoundingClientRect();
-            const elementsToFix = [];
-
-            // フィールド直下の絶対配置要素をすべて取得（タイル、ボール、矢印含む）
-            Array.from(fieldArea.children).forEach(child => {
-                const style = window.getComputedStyle(child);
-                if (style.position === 'absolute') {
-                    const rect = child.getBoundingClientRect();
-                    // field-area からの相対座標を計算
-                    const relLeft = rect.left - fieldRect.left;
-                    const relTop = rect.top - fieldRect.top;
-                    
-                    elementsToFix.push({
-                        index: Array.from(fieldArea.children).indexOf(child),
-                        left: relLeft,
-                        top: relTop,
-                        width: rect.width,
-                        height: rect.height
-                    });
-                }
-            });
-
-            try {
-                // oncloneコールバックで、キャプチャ直前のクローンDOMを操作する
-                const canvas = await html2canvas(targetElement, {
-                     scale: 2, // 解像度向上
-                     backgroundColor: area === 'field' ? null : '#1f2937',
-                     useCORS: true,
-                     logging: false,
-                     onclone: (clonedDoc) => {
-                         // クローンされたDOMのフィールドを取得
-                         const clonedField = clonedDoc.getElementById('field-area');
-                         if (!clonedField) return;
-
-                         // 収集した座標情報をクローン要素に適用
-                         const clonedChildren = Array.from(clonedField.children);
-                         elementsToFix.forEach(item => {
-                             const el = clonedChildren[item.index];
-                             if (el) {
-                                 // スタイルを強制上書き
-                                 el.style.position = 'absolute';
-                                 el.style.left = `${item.left}px`;
-                                 el.style.top = `${item.top}px`;
-                                 el.style.transform = 'none'; 
-                                 el.style.margin = '0';
-                                 el.style.bottom = 'auto';
-                                 el.style.right = 'auto';
-                             }
-                         });
-
-                         // 2. NEW: Fix internal vertical alignment for html2canvas
-                         // Fix Marks (Icons shifting down)
-                         const marks = clonedField.querySelectorAll('.mark');
-                         marks.forEach(mark => {
-                             // Force flex centering explicitly
-                             mark.style.display = 'flex';
-                             mark.style.alignItems = 'center';
-                             mark.style.justifyContent = 'center';
-                             // Reset margins/padding
-                             mark.style.margin = '0';
-                             mark.style.padding = '0';
-                             // Explicit line-height to prevent text baseline shift
-                             mark.style.lineHeight = '1'; 
-                             
-                             // If using FontAwesome, sometimes explicit height on the 'i' helps or unsetting it
-                             const icon = mark.querySelector('i');
-                             if(icon) {
-                                 icon.style.verticalAlign = 'middle';
-                                 icon.style.display = 'inline-block'; // helps with transform stability
-                             }
-                         });
-
-                         // Fix Names (Text shifting down)
-                         const tileTexts = clonedField.querySelectorAll('.tile-on-field div.mt-1');
-                         tileTexts.forEach(container => {
-                             container.style.marginTop = '2px'; // Reduce margin if it looks too low
-                             // Reset line heights of children
-                             Array.from(container.children).forEach(text => {
-                                 text.style.lineHeight = '1.2';
-                                 text.style.display = 'block';
-                             });
-                         });
-                     }
-                });
-                
-                const aspect = canvas.width / canvas.height;
-                const resizedCanvas = document.createElement('canvas');
-                resizedCanvas.width = width;
-                resizedCanvas.height = width / aspect;
-                const ctx = resizedCanvas.getContext('2d');
-                ctx.drawImage(canvas, 0, 0, resizedCanvas.width, resizedCanvas.height);
-
-                const dataUrl = resizedCanvas.toDataURL('image/jpeg', 0.9);
-                const a = document.createElement('a');
-                const date = new Date();
-                a.href = dataUrl;
-                a.download = `formation_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.jpeg`;
-                a.click();
-            } catch(e) {
-                console.error('Image export failed:', e);
-                alert('Image export failed. See console for details.');
-            } finally {
-                spinner.classList.add('hidden');
-                hideModals();
-            }
         }
 
         // --- 初期化処理 ---
