@@ -802,65 +802,80 @@
         function stabilizeElementsForCapture(clonedDoc, originalDoc, area) {
             const clonedField = clonedDoc.getElementById('field-area');
             const originalField = originalDoc.getElementById('field-area');
-            
-            // --- フィールド上の要素の補正 (元々の実装) ---
-            if (clonedField && originalField) {
-                const baseRect = originalField.getBoundingClientRect();
-                const targets = [
-                    { sel: '.tile-on-field', type: 'tile' },
-                    { sel: '.soccer-ball', type: 'ball' }
-                ];
+            if (!clonedField || !originalField) return;
 
-                targets.forEach(target => {
-                    const originalElements = Array.from(originalField.querySelectorAll(target.sel));
-                    const clonedElements = Array.from(clonedField.querySelectorAll(target.sel));
+            // フィールドの基準位置
+            const baseRect = originalField.getBoundingClientRect();
 
-                    originalElements.forEach((origEl, index) => {
-                        const cloneEl = clonedElements[index];
-                        if (!cloneEl) return;
-                        const rect = origEl.getBoundingClientRect();
-                        const left = rect.left - baseRect.left;
-                        const top = rect.top - baseRect.top;
-                        cloneEl.style.position = 'absolute';
-                        cloneEl.style.left = `${left}px`;
-                        cloneEl.style.top = `${top}px`;
-                        cloneEl.style.width = `${rect.width}px`;
-                        cloneEl.style.height = `${rect.height}px`;
-                        cloneEl.style.transform = 'none';
-                        cloneEl.style.margin = '0';
-                        cloneEl.style.right = 'auto';
-                        cloneEl.style.bottom = 'auto';
-                    });
+            // 1. タイルとボールの位置を絶対座標で固定
+            const targets = [
+                { sel: '.tile-on-field', type: 'tile' },
+                { sel: '.soccer-ball', type: 'ball' }
+            ];
+
+            targets.forEach(target => {
+                const originalElements = Array.from(originalField.querySelectorAll(target.sel));
+                const clonedElements = Array.from(clonedField.querySelectorAll(target.sel));
+
+                originalElements.forEach((origEl, index) => {
+                    const cloneEl = clonedElements[index];
+                    if (!cloneEl) return;
+
+                    // 元の要素の正確な位置とサイズを取得
+                    const rect = origEl.getBoundingClientRect();
+                    
+                    // フィールド内での相対座標に変換
+                    const left = rect.left - baseRect.left;
+                    const top = rect.top - baseRect.top;
+
+                    // スタイルを強制上書き (px指定)
+                    // transform, marginを排除して絶対配置にする
+                    cloneEl.style.position = 'absolute';
+                    cloneEl.style.left = `${left}px`;
+                    cloneEl.style.top = `${top}px`;
+                    cloneEl.style.width = `${rect.width}px`;
+                    cloneEl.style.height = `${rect.height}px`;
+                    cloneEl.style.transform = 'none';
+                    cloneEl.style.margin = '0';
+                    cloneEl.style.right = 'auto';
+                    cloneEl.style.bottom = 'auto';
                 });
-            }
-            
-            // --- 共通: フォントレンダリングのズレ補正 (全体適用) ---
-            
-            // 1. アイコン (マーク) の位置調整
-            const marks = clonedDoc.querySelectorAll('.mark');
+            });
+
+            // 2. マークとテキストの微調整 (html2canvas特有のズレ補正)
+            const marks = clonedField.querySelectorAll('.mark');
             marks.forEach(mark => {
+                // Flexboxのセンタリングを補強
                 mark.style.display = 'flex';
                 mark.style.alignItems = 'center';
                 mark.style.justifyContent = 'center';
+                mark.style.lineHeight = '1';
                 
-                const icon = mark.querySelector('i, svg');
+                // アイコン自体の位置調整: 少し上にずらす
+                const icon = mark.querySelector('i, svg'); // SVGの場合もあるので考慮
                 if (icon) {
                     icon.style.position = 'relative';
-                    icon.style.top = '-6px'; // 6px上に
+                    icon.style.top = '-6px'; // 強制的に6px上に
                 }
+                
+                // もしアイコンが無い場合（黄/赤カードなど）の微調整もここで行える
+                // 例: mark.style.paddingBottom = '1px'; 
             });
-
-            // 2. パネル内のテキスト (名前、ポジション、所属)
+            
+            // テキストコンテナの調整: 名前の下ズレ補正
+            // パネル内のテキスト (名前、ポジション、所属)
             const panelTiles = clonedDoc.querySelectorAll('.tile-on-panel');
             panelTiles.forEach(tile => {
                 const textContainer = tile.querySelector('div.ml-2');
                 if (textContainer) {
+                    // コンテナごと少し持ち上げる
                     textContainer.style.position = 'relative';
                     textContainer.style.top = '-6px'; 
                     
                     // 高さ不足による切れ防止：padding-bottomを追加
                     textContainer.style.paddingBottom = '15px';
-                    // コンテナ自体の高さを広げる必要があれば height: auto !important も検討
+                    textContainer.style.height = 'auto'; // 高さ自動調整
+                    textContainer.style.overflow = 'visible'; // はみ出し許可
                 }
             });
 
@@ -873,14 +888,17 @@
                 // 高さ不足による切れ防止
                 header.style.paddingBottom = '15px';
                 header.style.marginBottom = '0'; // mb-2などの影響を相殺
+                header.style.height = 'auto'; 
+                header.style.overflow = 'visible';
             });
-
-            // 4. フィールド上の名前・所属
-            const fieldTexts = clonedDoc.querySelectorAll('.tile-on-field > div.mt-1');
-            fieldTexts.forEach(div => {
-                 div.style.marginTop = '0'; 
-                 div.style.position = 'relative';
-                 div.style.top = '-6px'; // 6px上に
+            
+            const textContainers = clonedField.querySelectorAll('.tile-on-field > div.mt-1');
+            textContainers.forEach(div => {
+                // マージンを減らして全体を上に持ち上げる
+                // 元の mt-1 (0.25rem = 4px) よりも小さくする
+                div.style.marginTop = '0px'; 
+                div.style.position = 'relative';
+                div.style.top = '-6px'; // 持ち上げ
             });
         }
 
@@ -915,13 +933,18 @@
                     useCORS: true, // FontAwesomeなどのために必須
                     logging: false,
                     scrollX: 0,
-                    scrollY: 0,
+                    scrollY: -window.scrollY,
+                    windowWidth: document.documentElement.scrollWidth,
+                    windowHeight: document.documentElement.scrollHeight,
                     onclone: (clonedDoc) => {
+                        // モーダルを隠す
+                        clonedDoc.querySelectorAll('.modal-backdrop').forEach(el => el.style.display = 'none');
+                        
                         // クローンされたDOMに対して座標補正を適用
                         // 全体のクリッピングを解除して、はみ出しを表示させる
                         const clonedTarget = area === 'field' 
                             ? clonedDoc.getElementById('field-area') 
-                            : clonedDoc.querySelector('.flex-1.overflow-hidden');
+                            : clonedDoc.body;
                         
                         if (clonedTarget) {
                             clonedTarget.style.overflow = 'visible';
